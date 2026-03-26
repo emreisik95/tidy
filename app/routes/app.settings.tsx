@@ -9,9 +9,9 @@ import {
   InlineStack,
   Button,
   Badge,
+  Banner,
   Divider,
   Select,
-  List,
 } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import { authenticate, PLANS } from "../shopify.server";
@@ -53,7 +53,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   const plan = await getActivePlan(request);
   const shop = await prisma.shop.findUnique({ where: { domain: session.shop } });
-  return json({ plan, language: shop?.language || "en" });
+  return json({
+    plan,
+    language: shop?.language || "en",
+    isDev: process.env.NODE_ENV !== "production",
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -130,7 +134,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { plan, language } = useLoaderData<typeof loader>();
+  const { plan, language, isDev } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const [selectedLang, setSelectedLang] = useState(language);
 
@@ -232,6 +236,15 @@ export default function Settings() {
               </BlockStack>
             </Card>
           </BlockStack>
+
+          {isDev && (
+            <Banner tone="info">
+              <p>
+                Billing is disabled in dev mode. All features are available
+                for testing. Upgrade buttons will work after public distribution.
+              </p>
+            </Banner>
+          )}
         </Layout.AnnotatedSection>
       </Layout>
     </Page>

@@ -350,19 +350,21 @@ export default function ProductDetail() {
                   <Divider />
                   {unfixedIssues.map((issue) => (
                     <BlockStack key={issue.id} gap="200">
-                      <InlineStack align="space-between" blockAlign="center">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Badge
-                            tone={
-                              issue.severity === "critical"
-                                ? "critical"
-                                : issue.severity === "warning"
-                                  ? "warning"
-                                  : "info"
-                            }
-                          >
-                            {issue.severity}
-                          </Badge>
+                      <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                        <InlineStack gap="300" blockAlign="center" wrap={false}>
+                          <div style={{ minWidth: 70 }}>
+                            <Badge
+                              tone={
+                                issue.severity === "critical"
+                                  ? "critical"
+                                  : issue.severity === "warning"
+                                    ? "warning"
+                                    : "info"
+                              }
+                            >
+                              {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
+                            </Badge>
+                          </div>
                           <BlockStack gap="050">
                             <Text as="span" variant="bodyMd" fontWeight="semibold">
                               {formatIssueType(issue.type)}
@@ -445,7 +447,7 @@ export default function ProductDetail() {
                   </Text>
                   {fixedIssues.map((issue) => (
                     <InlineStack key={issue.id} gap="200" blockAlign="center">
-                      <Badge tone="success">fixed</Badge>
+                      <Badge tone="success">Fixed</Badge>
                       <Text as="span" variant="bodySm" tone="subdued">
                         {formatIssueType(issue.type)}
                       </Text>

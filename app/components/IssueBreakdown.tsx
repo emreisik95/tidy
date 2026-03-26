@@ -65,25 +65,26 @@ export function IssueBreakdown({ issues }: { issues: IssueSummary[] }) {
             key={issue.type}
             align="space-between"
             blockAlign="center"
+            wrap={false}
           >
-            <InlineStack gap="300" blockAlign="center">
+            <BlockStack gap="050">
+              <Text as="span" variant="bodyMd">
+                {formatIssueType(issue.type)}
+              </Text>
+              <Text as="span" variant="bodySm" tone="subdued">
+                {issue.count} {issue.count === 1 ? "product" : "products"}
+              </Text>
+            </BlockStack>
+            <InlineStack gap="200" blockAlign="center" wrap={false}>
               <Badge tone={severityTone(issue.severity)}>
-                {issue.severity}
+                {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
               </Badge>
-              <BlockStack gap="050">
-                <Text as="span" variant="bodyMd">
-                  {formatIssueType(issue.type)}
-                </Text>
-                <Text as="span" variant="bodySm" tone="subdued">
-                  {issue.count} {issue.count === 1 ? "product" : "products"}
-                </Text>
-              </BlockStack>
+              {AI_FIXABLE_TYPES.has(issue.type) && (
+                <Button size="slim" url="/app/products">
+                  Fix
+                </Button>
+              )}
             </InlineStack>
-            {AI_FIXABLE_TYPES.has(issue.type) && (
-              <Button size="slim" url="/app/products">
-                Fix
-              </Button>
-            )}
           </InlineStack>
         ))}
       </BlockStack>
