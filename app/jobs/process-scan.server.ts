@@ -1,8 +1,8 @@
 import { Worker, type Job } from "bullmq";
-import { connection } from "~/lib/queue.server";
-import prisma from "~/db.server";
-import { scoreProduct } from "~/services/scoring.server";
-import { parseJsonl } from "~/services/scanner.server";
+import { connection } from "../lib/queue.server";
+import prisma from "../db.server";
+import { scoreProduct } from "../services/scoring.server";
+import { parseJsonl } from "../services/scanner.server";
 
 export interface ProcessScanPayload {
   scanId: string;

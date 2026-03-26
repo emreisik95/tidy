@@ -1,6 +1,6 @@
 import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
-import prisma from "~/db.server";
-import type { ScannedProduct } from "~/lib/types";
+import prisma from "../db.server";
+import type { ScannedProduct } from "../lib/types";
 
 const PRODUCTS_BULK_QUERY = `
 {

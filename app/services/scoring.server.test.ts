@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { scoreProduct } from "./scoring.server";
-import type { ScannedProduct } from "~/lib/types";
+import type { ScannedProduct } from "../lib/types";
 
 const perfectProduct: ScannedProduct = {
   id: "gid://shopify/Product/1",

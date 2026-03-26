@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { connection } from "~/lib/queue.server";
+import { connection } from "../lib/queue.server";
 
 export interface ApplyFixPayload {
   issueId: string;

@@ -1,5 +1,5 @@
-import { startScanWorker } from "~/jobs/process-scan.server";
-import { startFixWorker } from "~/jobs/apply-fix.server";
+import { startScanWorker } from "../jobs/process-scan.server";
+import { startFixWorker } from "../jobs/apply-fix.server";
 
 let workersStarted = false;
 

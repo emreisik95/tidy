@@ -1,4 +1,4 @@
-import type { ScannedProduct, ScoringResult } from "~/lib/types";
+import type { ScannedProduct, ScoringResult } from "../lib/types";
 
 interface Rule {
   type: string;

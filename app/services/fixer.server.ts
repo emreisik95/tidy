@@ -1,4 +1,4 @@
-import prisma from "~/db.server";
+import prisma from "../db.server";
 import * as ai from "./ai.server";
 
 const PRODUCT_UPDATE_MUTATION = `

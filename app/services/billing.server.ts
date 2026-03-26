@@ -1,4 +1,4 @@
-import { authenticate, PLANS } from "~/shopify.server";
+import { authenticate, PLANS } from "../shopify.server";
 
 export type ActivePlan = "free" | "basic" | "ai";
 
