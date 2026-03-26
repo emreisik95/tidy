@@ -12,16 +12,9 @@ import {
   Banner,
   Spinner,
   Badge,
-  Icon,
-  Box,
   Divider,
 } from "@shopify/polaris";
-import {
-  SearchIcon,
-  AlertTriangleIcon,
-  MagicIcon,
-  CheckCircleIcon,
-} from "@shopify/polaris-icons";
+import { CheckCircleIcon } from "@shopify/polaris-icons";
 import { useEffect, useCallback, useState } from "react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -93,13 +86,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 function StepItem({
   number,
   icon,
-  tone,
   title,
   description,
 }: {
   number: string;
   icon: any;
-  tone: "info" | "warning" | "success";
   title: string;
   description: string;
 }) {
@@ -107,11 +98,11 @@ function StepItem({
     <Card>
       <BlockStack gap="300">
         <InlineStack gap="200" blockAlign="center">
-          <Box background={`bg-fill-${tone}`} borderRadius="200" padding="200">
-            <Icon source={icon} tone={tone} />
-          </Box>
+          <Text as="span" variant="headingLg" tone="subdued">
+            {number}
+          </Text>
           <Text as="h3" variant="headingSm">
-            {number}. {title}
+            {title}
           </Text>
         </InlineStack>
         <Text as="p" variant="bodySm" tone="subdued">
@@ -154,21 +145,18 @@ function OnboardingView({ onScan, isScanning }: { onScan: () => void; isScanning
             <StepItem
               number="1"
               icon={SearchIcon}
-              tone="info"
               title="Scan"
               description="Tidy pulls every product and checks 11 data points: titles, descriptions, images, alt text, SEO fields, categories, barcodes, and tags."
             />
             <StepItem
               number="2"
               icon={AlertTriangleIcon}
-              tone="warning"
               title="See what's broken"
               description="Each product gets a score out of 100. You'll see exactly which fields are empty, which images lack alt text, and what Google will reject."
             />
             <StepItem
               number="3"
               icon={MagicIcon}
-              tone="success"
               title="Fix with one click"
               description="AI writes your missing descriptions, SEO titles, alt text, and tags. Review, apply, move on. No spreadsheets, no freelancers."
             />
