@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useFetcher, Link } from "@remix-run/react";
+import { useLoaderData, useFetcher, useNavigate } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -146,6 +146,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
       : null,
     issueList,
     totalIssues,
+    aiFixableCount: latestScan?.productScores
+      ? latestScan.productScores.reduce(
+          (sum, ps) =>
+            sum + ps.issues.filter((i) => i.aiFixable && !i.fixedAt).length,
+          0,
+        )
+      : 0,
   });
 }
 
@@ -159,11 +166,12 @@ function StatusDot({ ok }: { ok: boolean | null }) {
 }
 
 export default function Dashboard() {
-  const { productCount, previewProducts, scan, issueList, totalIssues } =
+  const { productCount, previewProducts, scan, issueList, totalIssues, aiFixableCount } =
     useLoaderData<typeof loader>();
   const scanFetcher = useFetcher<{ scanId: string }>();
   const statusFetcher = useFetcher<{ scan: { status: string } }>();
   const revalidator = useRevalidator();
+  const navigate = useNavigate();
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
 
   const isScanning = activeScanId !== null || scan?.status === "running" || scan?.status === "pending";
@@ -209,7 +217,9 @@ export default function Dashboard() {
       }
       secondaryActions={
         hasScanResults
-          ? [{ content: "View all products", url: "/app/products" }]
+          ? [
+              { content: "View all products", url: "/app/products" },
+            ]
           : []
       }
     >
@@ -246,6 +256,23 @@ export default function Dashboard() {
           />
         )}
 
+        {/* Fix all banner */}
+        {hasScanResults && aiFixableCount > 0 && (
+          <Banner
+            tone="warning"
+            title={`${aiFixableCount} issues can be fixed with AI`}
+            action={{
+              content: "Fix all with AI",
+              url: "/app/products",
+            }}
+          >
+            <p>
+              Missing descriptions, SEO fields, alt text, and tags across
+              your products. Go to the products page to preview and apply fixes.
+            </p>
+          </Banner>
+        )}
+
         {/* Product preview table -- always visible, full width */}
         <Card padding="0">
           <BlockStack>
@@ -277,22 +304,23 @@ export default function Dashboard() {
                   id={product.id}
                   key={product.id}
                   position={index}
+                  onClick={() =>
+                    navigate(
+                      `/app/products/${encodeURIComponent(product.id)}`,
+                    )
+                  }
                 >
                   <IndexTable.Cell>
-                    <Link
-                      to={`/app/products/${encodeURIComponent(product.id)}`}
-                    >
-                      <InlineStack gap="300" blockAlign="center">
-                        <Thumbnail
-                          source={product.image || ImageIcon}
-                          alt={product.title}
-                          size="small"
-                        />
-                        <Text as="span" variant="bodyMd" fontWeight="semibold">
-                          {product.title}
-                        </Text>
-                      </InlineStack>
-                    </Link>
+                    <InlineStack gap="300" blockAlign="center">
+                      <Thumbnail
+                        source={product.image || ImageIcon}
+                        alt={product.title}
+                        size="small"
+                      />
+                      <Text as="span" variant="bodyMd" fontWeight="semibold">
+                        {product.title}
+                      </Text>
+                    </InlineStack>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <StatusDot ok={product.hasDescription} />
