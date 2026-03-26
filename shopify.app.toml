@@ -1,22 +1,32 @@
-# This file stores configurations for your Shopify app.
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
+client_id = "12a27c4c7dacedb33d32be3bd5d73327"
 name = "Tidy"
-client_id = ""
+application_url = "https://shopify.dev/apps/default-app-home"
+embedded = true
 
-[access_scopes]
-scopes = "read_products,write_products"
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
 
 [webhooks]
-api_version = "2025-04"
+api_version = "2026-04"
 
   [[webhooks.subscriptions]]
-  topics = ["app/uninstalled"]
+  topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
 
   [[webhooks.subscriptions]]
-  topics = ["app/scopes_update"]
+  topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
 
   [[webhooks.subscriptions]]
-  topics = ["bulk_operations/finish"]
+  topics = [ "bulk_operations/finish" ]
   uri = "/webhooks/bulk-operations-finish"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products,write_products"
+
+[auth]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]

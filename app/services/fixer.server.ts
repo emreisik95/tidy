@@ -26,7 +26,7 @@ async function shopifyGraphql(
   variables: Record<string, any>,
 ) {
   const response = await fetch(
-    `https://${shopDomain}/admin/api/2025-04/graphql.json`,
+    `https://${shopDomain}/admin/api/2026-04/graphql.json`,
     {
       method: "POST",
       headers: {
