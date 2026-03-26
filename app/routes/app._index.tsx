@@ -8,13 +8,13 @@ import {
   Button,
   BlockStack,
   InlineStack,
+  InlineGrid,
   Banner,
   Spinner,
   Badge,
   Icon,
   Box,
   Divider,
-  CalloutCard,
 } from "@shopify/polaris";
 import {
   SearchIcon,
@@ -90,158 +90,130 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 
+function StepItem({
+  number,
+  icon,
+  tone,
+  title,
+  description,
+}: {
+  number: string;
+  icon: any;
+  tone: "info" | "warning" | "success";
+  title: string;
+  description: string;
+}) {
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack gap="200" blockAlign="center">
+          <Box background={`bg-fill-${tone}`} borderRadius="200" padding="200">
+            <Icon source={icon} tone={tone} />
+          </Box>
+          <Text as="h3" variant="headingSm">
+            {number}. {title}
+          </Text>
+        </InlineStack>
+        <Text as="p" variant="bodySm" tone="subdued">
+          {description}
+        </Text>
+      </BlockStack>
+    </Card>
+  );
+}
+
 function OnboardingView({ onScan, isScanning }: { onScan: () => void; isScanning: boolean }) {
   return (
     <Page title="Tidy">
-      <Layout>
+      <BlockStack gap="600">
         {/* Hero */}
-        <Layout.Section>
-          <CalloutCard
-            title="Your products have blind spots. Let's find them."
-            illustration="https://cdn.shopify.com/s/files/1/0583/6465/7734/files/search-illustration.png?v=1629150170"
-            primaryAction={{
-              content: "Scan my products",
-              onAction: onScan,
-              loading: isScanning,
-            }}
-          >
-            <p>
-              Missing alt text, empty SEO fields, no Google categories — these
-              gaps cost you traffic and sales. Tidy checks every product in
-              your catalog in under a minute.
-            </p>
-          </CalloutCard>
-        </Layout.Section>
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingLg">
+              Your products have blind spots.
+            </Text>
+            <Text as="p" variant="bodyMd">
+              Missing alt text, empty SEO fields, no Google categories —
+              these gaps cost you traffic and sales. Tidy checks every
+              product in your catalog and tells you exactly what to fix.
+            </Text>
+            <Box>
+              <Button variant="primary" size="large" onClick={onScan} loading={isScanning}>
+                Scan my products
+              </Button>
+            </Box>
+          </BlockStack>
+        </Card>
 
-        {/* How it works - 3 concrete steps */}
-        <Layout.Section>
+        {/* How it works - 3 steps in a grid */}
+        <BlockStack gap="300">
           <Text as="h2" variant="headingMd">
             How it works
           </Text>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Box
-                  background="bg-fill-info"
-                  borderRadius="200"
-                  padding="200"
-                >
-                  <Icon source={SearchIcon} tone="info" />
-                </Box>
-                <Text as="h3" variant="headingSm">
-                  1. Scan
-                </Text>
-              </InlineStack>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Tidy pulls every product from your store and checks 11 data
-                points: titles, descriptions, images, alt text, SEO fields,
-                categories, barcodes, tags, and more.
-              </Text>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Box
-                  background="bg-fill-warning"
-                  borderRadius="200"
-                  padding="200"
-                >
-                  <Icon source={AlertTriangleIcon} tone="warning" />
-                </Box>
-                <Text as="h3" variant="headingSm">
-                  2. See what's broken
-                </Text>
-              </InlineStack>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Each product gets a score out of 100. You'll see exactly which
-                fields are empty, which images lack alt text, and which
-                products Google will reject.
-              </Text>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Box
-                  background="bg-fill-success"
-                  borderRadius="200"
-                  padding="200"
-                >
-                  <Icon source={WandIcon} tone="success" />
-                </Box>
-                <Text as="h3" variant="headingSm">
-                  3. Fix with one click
-                </Text>
-              </InlineStack>
-              <Text as="p" variant="bodySm" tone="subdued">
-                AI writes your missing descriptions, SEO titles, image alt
-                text, and tags. Review them, hit apply, and move on. No
-                spreadsheets, no freelancers.
-              </Text>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+          <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
+            <StepItem
+              number="1"
+              icon={SearchIcon}
+              tone="info"
+              title="Scan"
+              description="Tidy pulls every product and checks 11 data points: titles, descriptions, images, alt text, SEO fields, categories, barcodes, and tags."
+            />
+            <StepItem
+              number="2"
+              icon={AlertTriangleIcon}
+              tone="warning"
+              title="See what's broken"
+              description="Each product gets a score out of 100. You'll see exactly which fields are empty, which images lack alt text, and what Google will reject."
+            />
+            <StepItem
+              number="3"
+              icon={WandIcon}
+              tone="success"
+              title="Fix with one click"
+              description="AI writes your missing descriptions, SEO titles, alt text, and tags. Review, apply, move on. No spreadsheets, no freelancers."
+            />
+          </InlineGrid>
+        </BlockStack>
 
         {/* Why it matters */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Why this matters
-              </Text>
-              <Divider />
-              <InlineStack gap="400" align="start" wrap>
-                <BlockStack gap="100">
-                  <Text as="p" variant="headingSm" tone="critical">
-                    Google Merchant Center
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Missing categories and GTINs get your products
-                    disapproved. No Shopping ads, no sales.
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="100">
-                  <Text as="p" variant="headingSm" tone="caution">
-                    Search rankings
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Empty SEO titles and descriptions mean Google has nothing
-                    to show. Your products stay invisible.
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="100">
-                  <Text as="p" variant="headingSm" tone="magic">
-                    AI shopping
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    ChatGPT, Perplexity, and Google AI need structured product
-                    data. Gaps mean you're skipped.
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        {/* Bottom CTA */}
-        <Layout.Section>
-          <InlineStack align="center">
-            <Button variant="primary" size="large" onClick={onScan} loading={isScanning}>
-              Scan my products
-            </Button>
-          </InlineStack>
-        </Layout.Section>
-      </Layout>
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">
+              Why this matters
+            </Text>
+            <Divider />
+            <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
+              <BlockStack gap="100">
+                <Text as="p" variant="headingSm">
+                  Google Merchant Center
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Missing categories and GTINs get your products
+                  disapproved. No Shopping ads, no sales.
+                </Text>
+              </BlockStack>
+              <BlockStack gap="100">
+                <Text as="p" variant="headingSm">
+                  Search rankings
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Empty SEO titles and descriptions mean Google has nothing
+                  to show. Your products stay invisible.
+                </Text>
+              </BlockStack>
+              <BlockStack gap="100">
+                <Text as="p" variant="headingSm">
+                  AI shopping
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  ChatGPT, Perplexity, and Google AI need structured data
+                  to recommend products. Gaps mean you're skipped.
+                </Text>
+              </BlockStack>
+            </InlineGrid>
+          </BlockStack>
+        </Card>
+      </BlockStack>
     </Page>
   );
 }
