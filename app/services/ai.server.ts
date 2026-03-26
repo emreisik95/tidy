@@ -9,16 +9,39 @@ function langRule(lang: string): string {
 
 const ANTI_SLOP = `
 WRITING RULES - follow these strictly:
+
+STYLE:
 - Write like a person, not a machine. Read it aloud - if it sounds robotic, rewrite it.
-- NEVER use these words: unlock, empower, seamlessly, leverage, elevate, delve, robust, cutting-edge, game-changing, innovative, transform, revolutionize, harness, foster, tapestry, beacon, realm, pivotal, crucial.
-- NEVER use these patterns: "It's not just X, it's Y", "In today's fast-paced...", "Gone are the days", "The best part?", "Here's the thing", "Let that sink in".
-- No staccato fragments like "Simple. Clean. Effective."
-- No hedging - say "this works" not "this might help".
 - Short sentences. Plain words. Write for someone scanning on their phone.
-- Be specific - use numbers and details, not vague claims.
 - No corporate jargon. Write like you're explaining to a friend who runs a small shop.
-- NEVER invent facts. No prices, no measurements, no materials unless explicitly provided in the input. If you don't know it, don't write it.
-- NEVER say "starting at $X", "only $X", "affordable", or any price-related language.
+- No hedging - say "this works" not "this might help".
+- No staccato fragments like "Simple. Clean. Effective."
+
+BANNED WORDS: unlock, empower, seamlessly, leverage, elevate, delve, robust, cutting-edge, game-changing, innovative, transform, revolutionize, harness, foster, tapestry, beacon, realm, pivotal, crucial, elevate, curate, artisan, bespoke, meticulously, thoughtfully, effortlessly, exquisite, premium quality, world-class, state-of-the-art, next-level, must-have, stunning.
+
+BANNED PATTERNS: "It's not just X, it's Y", "In today's fast-paced...", "Gone are the days", "The best part?", "Here's the thing", "Let that sink in", "Whether you're X or Y", "Say goodbye to", "Take your X to the next level", "Designed with X in mind", "Perfect for X and Y alike".
+
+HALLUCINATION RULES - these are critical:
+- NEVER invent facts that aren't in the input. This includes:
+  - Prices, discounts, or any monetary amounts
+  - Exact measurements, weights, or dimensions
+  - Specific materials (don't say "cotton" unless the input says cotton)
+  - Manufacturing details or origin countries
+  - Awards, certifications, or ratings
+  - Shipping info, return policies, or guarantees
+  - Stock levels or availability ("limited edition", "selling fast")
+  - Comparisons to other products or brands
+  - Health claims, safety claims, or regulatory statements
+  - Number of colors/sizes/variants available
+- If the input doesn't mention it, don't write it. Stick to what you can see and what you're told.
+- When in doubt, be vague rather than specific: "available in multiple sizes" is better than inventing "S through XXL".
+
+LEGAL SAFETY:
+- No health or medical claims ("helps with back pain", "hypoallergenic")
+- No absolute safety claims ("100% safe", "non-toxic") unless stated in input
+- No false urgency ("limited time", "act now", "selling fast")
+- No competitor comparisons ("better than X brand")
+- No environmental claims ("eco-friendly", "sustainable") unless stated in input
 `;
 
 async function generate(
