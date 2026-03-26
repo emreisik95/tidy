@@ -93,16 +93,23 @@ export async function action({ request }: ActionFunctionArgs) {
             },
           },
         );
-        // Mark all SEO-related issues as fixed since we set both
-        await prisma.issue.updateMany({
+        // Mark ALL SEO issues as fixed (find IDs first, updateMany can't filter by relation)
+        const seoIssues = await prisma.issue.findMany({
           where: {
             productScore: { productGid },
             type: { in: ["missing_seo_title", "missing_seo_description", "short_seo_description"] },
             fixedAt: null,
           },
-          data: { fixedAt: new Date() },
+          select: { id: true },
         });
-        // Return early -- we already marked all SEO issues
+        if (seoIssues.length > 0) {
+          await prisma.issue.updateMany({
+            where: { id: { in: seoIssues.map((i) => i.id) } },
+            data: { fixedAt: new Date() },
+          });
+        }
+        // Recalculate score and return
+        await recalculateScore(productGid);
         return json({ success: true, issueId, issueType });
       }
 
@@ -170,6 +177,9 @@ export async function action({ request }: ActionFunctionArgs) {
       data: { fixedAt: new Date() },
     });
 
+    // Recalculate product score based on remaining unfixed issues
+    await recalculateScore(productGid);
+
     return json({ success: true, issueId, issueType });
   } catch (err: any) {
     console.error("Fix error:", err.message);
@@ -178,4 +188,54 @@ export async function action({ request }: ActionFunctionArgs) {
       { status: 500 },
     );
   }
+}
+
+async function recalculateScore(productGid: string) {
+  // Find the latest productScore for this product
+  const productScore = await prisma.productScore.findFirst({
+    where: { productGid },
+    orderBy: { createdAt: "desc" },
+    include: { issues: true },
+  });
+
+  if (!productScore) return;
+
+  // Count weight of remaining unfixed issues
+  const WEIGHTS: Record<string, number> = {
+    missing_title: 10,
+    missing_description: 15,
+    no_images: 10,
+    missing_alt_text: 15,
+    missing_seo_title: 12,
+    missing_seo_description: 12,
+    missing_category: 8,
+    missing_product_type: 5,
+    no_tags: 5,
+    missing_barcode: 5,
+    missing_vendor: 3,
+  };
+  const MAX_WEIGHT = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
+
+  const unfixedWeight = productScore.issues
+    .filter((i) => !i.fixedAt)
+    .reduce((sum, i) => sum + (WEIGHTS[i.type] || 0), 0);
+
+  const newScore = Math.round(((MAX_WEIGHT - unfixedWeight) / MAX_WEIGHT) * 100);
+
+  await prisma.productScore.update({
+    where: { id: productScore.id },
+    data: { score: newScore },
+  });
+
+  // Also update the scan's overall score
+  const allScores = await prisma.productScore.findMany({
+    where: { scanId: productScore.scanId },
+  });
+  const avgScore = Math.round(
+    allScores.reduce((sum, s) => sum + s.score, 0) / allScores.length,
+  );
+  await prisma.scan.update({
+    where: { id: productScore.scanId },
+    data: { overallScore: avgScore },
+  });
 }
