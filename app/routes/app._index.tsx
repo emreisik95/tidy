@@ -11,6 +11,7 @@ import {
   Banner,
   Spinner,
   Badge,
+  Box,
   Divider,
   IndexTable,
   Thumbnail,
