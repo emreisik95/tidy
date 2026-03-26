@@ -93,18 +93,18 @@ export async function action({ request }: ActionFunctionArgs) {
             },
           },
         );
-        // Mark ALL SEO issues as fixed (find IDs first, updateMany can't filter by relation)
-        const seoIssues = await prisma.issue.findMany({
-          where: {
-            productScore: { productGid },
-            type: { in: ["missing_seo_title", "missing_seo_description", "short_seo_description"] },
-            fixedAt: null,
-          },
-          select: { id: true },
+        // Mark ALL SEO issues in the same scan as fixed
+        const thisIssue = await prisma.issue.findUnique({
+          where: { id: issueId },
+          select: { productScoreId: true },
         });
-        if (seoIssues.length > 0) {
+        if (thisIssue) {
           await prisma.issue.updateMany({
-            where: { id: { in: seoIssues.map((i) => i.id) } },
+            where: {
+              productScoreId: thisIssue.productScoreId,
+              type: { in: ["missing_seo_title", "missing_seo_description", "short_seo_description"] },
+              fixedAt: null,
+            },
             data: { fixedAt: new Date() },
           });
         }

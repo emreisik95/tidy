@@ -53,6 +53,17 @@ export async function startScan(
     create: { domain: shopDomain },
   });
 
+  // Delete old scans (keep only the latest)
+  const oldScans = await prisma.scan.findMany({
+    where: { shopId: shop.id },
+    select: { id: true },
+  });
+  if (oldScans.length > 0) {
+    await prisma.scan.deleteMany({
+      where: { id: { in: oldScans.map((s) => s.id) } },
+    });
+  }
+
   const scan = await prisma.scan.create({
     data: { shopId: shop.id, status: "pending" },
   });
