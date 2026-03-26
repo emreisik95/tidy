@@ -281,7 +281,6 @@ export default function Dashboard() {
                   <IndexTable.Cell>
                     <Link
                       to={`/app/products/${encodeURIComponent(product.id)}`}
-                      removeUnderline
                     >
                       <InlineStack gap="300" blockAlign="center">
                         <Thumbnail
