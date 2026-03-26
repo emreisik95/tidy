@@ -2,17 +2,14 @@ import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
 import {
   Page,
-  Layout,
   Card,
   Text,
-  Button,
   BlockStack,
   InlineStack,
   Banner,
   Spinner,
   Badge,
   Box,
-  Divider,
   IndexTable,
   Thumbnail,
 } from "@shopify/polaris";
@@ -211,185 +208,120 @@ export default function Dashboard() {
           : []
       }
     >
-      <Layout>
-        {/* Main content */}
-        <Layout.Section>
-          <BlockStack gap="500">
-            {/* Scanning banner */}
-            {isScanning && (
-              <Banner tone="info">
-                <InlineStack gap="300" blockAlign="center">
-                  <Spinner size="small" />
-                  <Text as="span" variant="bodyMd">
-                    Scanning {productCount} products. This takes under a minute.
+      <BlockStack gap="500">
+        {/* Scanning banner */}
+        {isScanning && (
+          <Banner tone="info">
+            <InlineStack gap="300" blockAlign="center">
+              <Spinner size="small" />
+              <Text as="span" variant="bodyMd">
+                Scanning {productCount} products. This takes under a minute.
+              </Text>
+            </InlineStack>
+          </Banner>
+        )}
+
+        {/* Pre-scan hint */}
+        {!hasScanResults && !isScanning && (
+          <Banner tone="warning" title="Your product data hasn't been checked yet">
+            <p>
+              Hit "Scan my products" to find missing descriptions, alt text,
+              SEO fields, and other gaps that hurt your Google and search visibility.
+              Nothing gets changed until you approve it.
+            </p>
+          </Banner>
+        )}
+
+        {/* Score card (only after scan) */}
+        {hasScanResults && (
+          <ScoreCard
+            score={scan.overallScore ?? 0}
+            totalProducts={scan.totalProducts}
+            issueCount={totalIssues}
+          />
+        )}
+
+        {/* Product preview table -- always visible, full width */}
+        <Card padding="0">
+          <BlockStack>
+            <Box padding="400" paddingBlockEnd="200">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingSm">
+                  {hasScanResults ? "Recent products" : "Your products"}
+                </Text>
+                {!hasScanResults && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Scores appear after scanning
                   </Text>
-                </InlineStack>
-              </Banner>
-            )}
-
-            {/* Score card (only after scan) */}
-            {hasScanResults && (
-              <ScoreCard
-                score={scan.overallScore ?? 0}
-                totalProducts={scan.totalProducts}
-                issueCount={totalIssues}
-              />
-            )}
-
-            {/* Product preview table -- always visible */}
-            <Card padding="0">
-              <BlockStack>
-                <Box padding="400" paddingBlockEnd="200">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Text as="h2" variant="headingSm">
-                      {hasScanResults ? "Recent products" : "Your products"}
-                    </Text>
-                    {!hasScanResults && (
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        Scores appear after scanning
-                      </Text>
-                    )}
-                  </InlineStack>
-                </Box>
-                <IndexTable
-                  itemCount={previewProducts.length}
-                  headings={[
-                    { title: "Product" },
-                    { title: "Description" },
-                    { title: "Alt text" },
-                    { title: "SEO title" },
-                    { title: "Score" },
-                  ]}
-                  selectable={false}
+                )}
+              </InlineStack>
+            </Box>
+            <IndexTable
+              itemCount={previewProducts.length}
+              headings={[
+                { title: "Product" },
+                { title: "Description" },
+                { title: "Alt text" },
+                { title: "SEO title" },
+                { title: "Score" },
+              ]}
+              selectable={false}
+            >
+              {previewProducts.map((product, index) => (
+                <IndexTable.Row
+                  id={product.id}
+                  key={product.id}
+                  position={index}
                 >
-                  {previewProducts.map((product, index) => (
-                    <IndexTable.Row
-                      id={product.id}
-                      key={product.id}
-                      position={index}
-                    >
-                      <IndexTable.Cell>
-                        <InlineStack gap="300" blockAlign="center">
-                          <Thumbnail
-                            source={product.image || ImageIcon}
-                            alt={product.title}
-                            size="small"
-                          />
-                          <Text as="span" variant="bodyMd" fontWeight="semibold">
-                            {product.title}
-                          </Text>
-                        </InlineStack>
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <StatusDot ok={product.hasDescription} />
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <StatusDot ok={product.hasAltText} />
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        <StatusDot ok={product.hasSeoTitle} />
-                      </IndexTable.Cell>
-                      <IndexTable.Cell>
-                        {product.score !== null ? (
-                          <Badge
-                            tone={
-                              product.score >= 80
-                                ? "success"
-                                : product.score >= 50
-                                  ? "warning"
-                                  : "critical"
-                            }
-                          >
-                            {product.score}
-                          </Badge>
-                        ) : (
-                          <Text as="span" tone="subdued">&mdash;</Text>
-                        )}
-                      </IndexTable.Cell>
-                    </IndexTable.Row>
-                  ))}
-                </IndexTable>
-              </BlockStack>
-            </Card>
-
-            {/* Issue breakdown (only after scan) */}
-            {hasScanResults && issueList.length > 0 && (
-              <IssueBreakdown issues={issueList} />
-            )}
-          </BlockStack>
-        </Layout.Section>
-
-        {/* Sidebar */}
-        <Layout.Section variant="oneThird">
-          <BlockStack gap="400">
-            {!hasScanResults ? (
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingSm">
-                    What Tidy checks
-                  </Text>
-                  <Divider />
-                  <BlockStack gap="200">
-                    {[
-                      "Image alt text",
-                      "SEO titles and descriptions",
-                      "Product descriptions",
-                      "Google product categories",
-                      "Barcodes and GTINs",
-                      "Tags and vendor info",
-                    ].map((item) => (
-                      <Text key={item} as="p" variant="bodySm">
-                        {item}
+                  <IndexTable.Cell>
+                    <InlineStack gap="300" blockAlign="center">
+                      <Thumbnail
+                        source={product.image || ImageIcon}
+                        alt={product.title}
+                        size="small"
+                      />
+                      <Text as="span" variant="bodyMd" fontWeight="semibold">
+                        {product.title}
                       </Text>
-                    ))}
-                  </BlockStack>
-                  <Divider />
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Nothing is changed until you approve it.
-                  </Text>
-                </BlockStack>
-              </Card>
-            ) : (
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingSm">
-                    Worst scores
-                  </Text>
-                  <Divider />
-                  {previewProducts
-                    .filter((p) => p.score !== null)
-                    .sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
-                    .slice(0, 5)
-                    .map((p) => (
-                      <InlineStack
-                        key={p.id}
-                        align="space-between"
-                        blockAlign="center"
+                    </InlineStack>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <StatusDot ok={product.hasDescription} />
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <StatusDot ok={product.hasAltText} />
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <StatusDot ok={product.hasSeoTitle} />
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {product.score !== null ? (
+                      <Badge
+                        tone={
+                          product.score >= 80
+                            ? "success"
+                            : product.score >= 50
+                              ? "warning"
+                              : "critical"
+                        }
                       >
-                        <Link to={`/app/products/${encodeURIComponent(p.id)}`}>
-                          <Text as="span" variant="bodySm">
-                            {p.title}
-                          </Text>
-                        </Link>
-                        <Badge
-                          tone={
-                            (p.score ?? 0) >= 80
-                              ? "success"
-                              : (p.score ?? 0) >= 50
-                                ? "warning"
-                                : "critical"
-                          }
-                        >
-                          {p.score}
-                        </Badge>
-                      </InlineStack>
-                    ))}
-                </BlockStack>
-              </Card>
-            )}
+                        {product.score}
+                      </Badge>
+                    ) : (
+                      <Text as="span" tone="subdued">&mdash;</Text>
+                    )}
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
           </BlockStack>
-        </Layout.Section>
-      </Layout>
+        </Card>
+
+        {/* Issue breakdown (only after scan) */}
+        {hasScanResults && issueList.length > 0 && (
+          <IssueBreakdown issues={issueList} />
+        )}
+      </BlockStack>
     </Page>
   );
 }
