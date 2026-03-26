@@ -1,10 +1,29 @@
-import { Card, DataTable, Text, Badge, BlockStack } from "@shopify/polaris";
+import {
+  Card,
+  Text,
+  Badge,
+  BlockStack,
+  InlineStack,
+  Button,
+  Divider,
+} from "@shopify/polaris";
 
 interface IssueSummary {
   type: string;
   count: number;
   severity: string;
 }
+
+const AI_FIXABLE_TYPES = new Set([
+  "missing_description",
+  "short_description",
+  "missing_alt_text",
+  "missing_seo_title",
+  "missing_seo_description",
+  "short_seo_description",
+  "missing_product_type",
+  "no_tags",
+]);
 
 function formatIssueType(type: string): string {
   return type
@@ -21,25 +40,52 @@ function severityTone(
 }
 
 export function IssueBreakdown({ issues }: { issues: IssueSummary[] }) {
-  const rows = issues.map((issue) => [
-    formatIssueType(issue.type),
-    <Badge key={issue.type} tone={severityTone(issue.severity)}>
-      {issue.severity}
-    </Badge>,
-    issue.count.toString(),
-  ]);
+  const fixableCount = issues
+    .filter((i) => AI_FIXABLE_TYPES.has(i.type))
+    .reduce((sum, i) => sum + i.count, 0);
 
   return (
     <Card>
       <BlockStack gap="400">
-        <Text as="h2" variant="headingMd">
-          Issues by Type
-        </Text>
-        <DataTable
-          columnContentTypes={["text", "text", "numeric"]}
-          headings={["Issue", "Severity", "Count"]}
-          rows={rows}
-        />
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="h2" variant="headingMd">
+            Issues found
+          </Text>
+          {fixableCount > 0 && (
+            <Text as="span" variant="bodySm" tone="subdued">
+              {fixableCount} fixable with AI
+            </Text>
+          )}
+        </InlineStack>
+
+        <Divider />
+
+        {issues.map((issue) => (
+          <InlineStack
+            key={issue.type}
+            align="space-between"
+            blockAlign="center"
+          >
+            <InlineStack gap="300" blockAlign="center">
+              <Badge tone={severityTone(issue.severity)}>
+                {issue.severity}
+              </Badge>
+              <BlockStack gap="050">
+                <Text as="span" variant="bodyMd">
+                  {formatIssueType(issue.type)}
+                </Text>
+                <Text as="span" variant="bodySm" tone="subdued">
+                  {issue.count} {issue.count === 1 ? "product" : "products"}
+                </Text>
+              </BlockStack>
+            </InlineStack>
+            {AI_FIXABLE_TYPES.has(issue.type) && (
+              <Button size="slim" url="/app/products">
+                Fix
+              </Button>
+            )}
+          </InlineStack>
+        ))}
       </BlockStack>
     </Card>
   );

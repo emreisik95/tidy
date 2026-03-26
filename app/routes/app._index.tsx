@@ -279,16 +279,21 @@ export default function Dashboard() {
                   position={index}
                 >
                   <IndexTable.Cell>
-                    <InlineStack gap="300" blockAlign="center">
-                      <Thumbnail
-                        source={product.image || ImageIcon}
-                        alt={product.title}
-                        size="small"
-                      />
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        {product.title}
-                      </Text>
-                    </InlineStack>
+                    <Link
+                      to={`/app/products/${encodeURIComponent(product.id)}`}
+                      removeUnderline
+                    >
+                      <InlineStack gap="300" blockAlign="center">
+                        <Thumbnail
+                          source={product.image || ImageIcon}
+                          alt={product.title}
+                          size="small"
+                        />
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                          {product.title}
+                        </Text>
+                      </InlineStack>
+                    </Link>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <StatusDot ok={product.hasDescription} />
