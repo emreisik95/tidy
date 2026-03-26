@@ -1,16 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -31,4 +25,96 @@ model Session {
   emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+enum PlanName {
+  free
+  basic
+  ai
+}
+
+enum ScanStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+enum IssueSeverity {
+  critical
+  warning
+  info
+}
+
+enum IssueType {
+  missing_title
+  weak_title
+  missing_description
+  short_description
+  no_images
+  missing_alt_text
+  missing_seo_title
+  missing_seo_description
+  short_seo_description
+  missing_category
+  missing_product_type
+  no_tags
+  missing_barcode
+  missing_vendor
+}
+
+model Shop {
+  id          String   @id @default(cuid())
+  domain      String   @unique
+  plan        PlanName @default(free)
+  billingId   String?
+  installedAt DateTime @default(now())
+  lastScanAt  DateTime?
+  scans       Scan[]
+}
+
+model Scan {
+  id              String        @id @default(cuid())
+  shopId          String
+  shop            Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  status          ScanStatus    @default(pending)
+  bulkOperationId String?
+  totalProducts   Int           @default(0)
+  scannedProducts Int           @default(0)
+  overallScore    Float?
+  startedAt       DateTime      @default(now())
+  completedAt     DateTime?
+  productScores   ProductScore[]
+
+  @@index([shopId])
+}
+
+model ProductScore {
+  id           String   @id @default(cuid())
+  scanId       String
+  scan         Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  productGid   String
+  productTitle String
+  score        Float
+  maxScore     Float    @default(100)
+  imageCount   Int      @default(0)
+  issues       Issue[]
+  createdAt    DateTime @default(now())
+
+  @@index([scanId])
+  @@index([productGid])
+}
+
+model Issue {
+  id             String        @id @default(cuid())
+  productScoreId String
+  productScore   ProductScore  @relation(fields: [productScoreId], references: [id], onDelete: Cascade)
+  type           IssueType
+  severity       IssueSeverity
+  field          String
+  message        String
+  aiFixable      Boolean       @default(false)
+  fixedAt        DateTime?
+
+  @@index([productScoreId])
 }
