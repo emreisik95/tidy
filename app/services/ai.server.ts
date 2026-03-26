@@ -2,10 +2,22 @@ import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-function langInstruction(lang: string): string {
+function langRule(lang: string): string {
   if (lang === "en") return "";
-  return `\nIMPORTANT: Write ALL content in ${lang}. Do not use English.`;
+  return `\n\nLANGUAGE RULE: Write everything in ${lang}. Not English.`;
 }
+
+const ANTI_SLOP = `
+WRITING RULES - follow these strictly:
+- Write like a person, not a machine. Read it aloud - if it sounds robotic, rewrite it.
+- NEVER use these words: unlock, empower, seamlessly, leverage, elevate, delve, robust, cutting-edge, game-changing, innovative, transform, revolutionize, harness, foster, tapestry, beacon, realm, pivotal, crucial.
+- NEVER use these patterns: "It's not just X, it's Y", "In today's fast-paced...", "Gone are the days", "The best part?", "Here's the thing", "Let that sink in".
+- No staccato fragments like "Simple. Clean. Effective."
+- No hedging - say "this works" not "this might help".
+- Short sentences. Plain words. Write for someone scanning on their phone.
+- Be specific - use numbers and details, not vague claims.
+- No corporate jargon. Write like you're explaining to a friend who runs a small shop.
+`;
 
 async function generate(
   systemPrompt: string,
@@ -30,8 +42,18 @@ export async function generateDescription(
   lang = "en",
 ): Promise<string> {
   const raw = await generate(
-    `You are a professional e-commerce copywriter. Write compelling, accurate product descriptions. Do not invent features. Return JSON: {"description": "..."}${langInstruction(lang)}`,
-    `Write a 100-300 word product description for:\nTitle: ${title}\nType: ${productType}\n${existingDescription ? `Current (improve this): ${existingDescription}` : "No existing description."}`,
+    `You write product descriptions for Shopify stores. Your job is to help merchants sell more by writing clear, honest descriptions that answer the customer's questions.
+${ANTI_SLOP}
+Think about what a customer actually wants to know:
+- What is this product made of?
+- What does it look like in person?
+- Who is it for?
+- What problem does it solve?
+
+Write 2-3 short paragraphs. No bullet points unless asked. Start with the most important detail, not a generic opener.
+
+Return JSON: {"description": "..."}${langRule(lang)}`,
+    `Write a product description for this Shopify product:\n\nTitle: ${title}\nType: ${productType}${existingDescription ? `\n\nCurrent description (rewrite and improve - keep any factual details): ${existingDescription}` : "\n\nNo existing description - write from scratch based on the title and type."}`,
   );
   return JSON.parse(raw).description;
 }
@@ -43,8 +65,22 @@ export async function generateSeo(
   lang = "en",
 ): Promise<{ seoTitle: string; seoDescription: string }> {
   const raw = await generate(
-    `You are an SEO specialist. Generate meta titles and descriptions that maximize click-through rates. Return JSON: {"seoTitle": "...", "seoDescription": "..."}${langInstruction(lang)}`,
-    `Generate SEO metadata for:\nProduct: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 500)}\n\nRules: seoTitle 50-60 chars, seoDescription 140-160 chars.`,
+    `You write SEO meta titles and descriptions for Shopify product pages. These show up in Google search results - they need to make someone click.
+${ANTI_SLOP}
+SEO title rules:
+- 50-60 characters max
+- Include the product name and one key detail (material, color, or use case)
+- Don't stuff keywords
+- Don't start with the store name
+
+SEO description rules:
+- 140-160 characters max
+- Answer "why should I click this?" in one sentence
+- Include one specific detail (price range, material, feature)
+- End with something actionable but not cheesy
+
+Return JSON: {"seoTitle": "...", "seoDescription": "..."}${langRule(lang)}`,
+    `Write SEO metadata for this Shopify product:\n\nProduct: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 400)}`,
   );
   return JSON.parse(raw);
 }
@@ -59,12 +95,21 @@ export async function generateAltText(
     messages: [
       {
         role: "system",
-        content: `Write concise alt text for product images. Focus on what the image shows. Do not start with 'Image of' or 'Photo of'. Return JSON: {"altText": "..."}${langInstruction(lang)}`,
+        content: `You write image alt text for Shopify product images. Alt text helps visually impaired shoppers and improves SEO.
+${ANTI_SLOP}
+Rules:
+- 50-125 characters
+- Describe what the image actually shows - colors, angles, context
+- Don't start with "Image of" or "Photo of" or "Picture of"
+- Include the product name naturally
+- Mention the most visually obvious detail (color, material, setting)
+
+Return JSON: {"altText": "..."}${langRule(lang)}`,
       },
       {
         role: "user",
         content: [
-          { type: "text", text: `Alt text for this product image. Product: ${productTitle}` },
+          { type: "text", text: `Write alt text for this product image.\nProduct: ${productTitle}` },
           { type: "image_url", image_url: { url: imageUrl } },
         ],
       },
@@ -75,18 +120,6 @@ export async function generateAltText(
   return JSON.parse(response.choices[0].message.content || "{}").altText;
 }
 
-export async function suggestCategoryName(
-  title: string,
-  description: string,
-  productType: string,
-): Promise<string> {
-  const raw = await generate(
-    `You are a product categorization expert. Suggest the most specific product category for the given product. Return a short category path like "Apparel > Men's Clothing > Jeans" or "Health & Beauty > Fragrances > Men's Cologne". Be specific. Return JSON: {"category": "..."}`,
-    `Categorize this product:\nTitle: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 300)}`,
-  );
-  return JSON.parse(raw).category;
-}
-
 export async function generateTags(
   title: string,
   description: string,
@@ -94,8 +127,31 @@ export async function generateTags(
   lang = "en",
 ): Promise<string[]> {
   const raw = await generate(
-    `Generate 5-10 relevant product tags for discoverability. Use lowercase. Include material, style, occasion, category. Return JSON: {"tags": ["...", ...]}${langInstruction(lang)}`,
-    `Generate tags for:\nProduct: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 500)}`,
+    `You generate product tags for Shopify stores. Tags help with internal search, collections, and filtering.
+${ANTI_SLOP}
+Rules:
+- 5-10 tags
+- All lowercase
+- Mix of: material tags (cotton, leather), style tags (casual, formal), use-case tags (gift, everyday), category tags (mens, womens, unisex)
+- Include specific details from the product, not generic terms
+- No multi-word marketing phrases - keep tags to 1-2 words each
+
+Return JSON: {"tags": ["...", ...]}${langRule(lang)}`,
+    `Generate tags for this Shopify product:\n\nProduct: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 400)}`,
   );
   return JSON.parse(raw).tags;
+}
+
+export async function suggestCategoryName(
+  title: string,
+  description: string,
+  productType: string,
+): Promise<string> {
+  const raw = await generate(
+    `You categorize Shopify products into the Shopify Standard Product Taxonomy. Suggest the most specific category path that fits this product. Use real category names from the Shopify taxonomy (e.g. "Apparel & Accessories > Clothing > Pants", "Health & Beauty > Personal Care > Cosmetics > Perfume & Cologne"). Be as specific as possible - leaf categories are better than broad ones.
+
+Return JSON: {"category": "Category > Subcategory > Specific"}`,
+    `Categorize this product:\nTitle: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 300)}`,
+  );
+  return JSON.parse(raw).category;
 }
