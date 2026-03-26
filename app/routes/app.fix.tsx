@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "~/shopify.server";
 import { fixQueue } from "~/lib/queue.server";
+import { getActivePlan } from "~/services/billing.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -12,6 +13,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (!issueId || !productGid) {
     return json({ error: "issueId and productGid are required" }, { status: 400 });
+  }
+
+  const plan = await getActivePlan(request);
+  if (plan !== "ai") {
+    return json(
+      { error: "AI fixes require the AI plan ($9.99/mo)" },
+      { status: 403 },
+    );
   }
 
   const job = await fixQueue.add(
