@@ -204,6 +204,9 @@ export default function ProductList() {
               </Text>
             </BlockStack>
           )}
+
+          {/* Bottom spacing */}
+          <div style={{ height: "2rem" }} />
         </Layout.Section>
       </Layout>
     </Page>

@@ -57,7 +57,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { billing, session } = await authenticate.admin(request);
+  const { admin, billing, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
@@ -75,11 +75,54 @@ export async function action({ request }: ActionFunctionArgs) {
     const targetPlan = formData.get("plan") as string;
     if (targetPlan === "basic" || targetPlan === "ai") {
       const planName = targetPlan === "ai" ? PLANS.AI : PLANS.BASIC;
-      await billing.require({
-        plans: [planName],
-        isTest: true,
-        onFailure: async () => redirect("/app/settings"),
-      });
+      const amount = targetPlan === "ai" ? 9.99 : 4.99;
+
+      // Create a subscription request -- redirects merchant to Shopify approval page
+      const response = await admin.graphql(
+        `
+        mutation CreateSubscription($name: String!, $amount: Decimal!, $returnUrl: URL!) {
+          appSubscriptionCreate(
+            name: $name
+            test: true
+            returnUrl: $returnUrl
+            lineItems: [{
+              plan: {
+                appRecurringPricingDetails: {
+                  price: { amount: $amount, currencyCode: USD }
+                  interval: EVERY_30_DAYS
+                }
+              }
+            }]
+          ) {
+            appSubscription { id }
+            confirmationUrl
+            userErrors { field message }
+          }
+        }
+      `,
+        {
+          variables: {
+            name: planName,
+            amount,
+            returnUrl: `${process.env.SHOPIFY_APP_URL}/app/settings`,
+          },
+        },
+      );
+
+      const data = await response.json();
+      const { confirmationUrl, userErrors } =
+        data.data.appSubscriptionCreate;
+
+      if (userErrors.length > 0) {
+        return json(
+          { error: userErrors.map((e: any) => e.message).join(", ") },
+          { status: 400 },
+        );
+      }
+
+      if (confirmationUrl) {
+        return redirect(confirmationUrl);
+      }
     }
   }
 
