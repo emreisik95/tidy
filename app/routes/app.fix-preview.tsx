@@ -92,6 +92,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
     return json({ preview });
   } catch (err: any) {
-    return json({ error: err.message || "AI generation failed" }, { status: 500 });
+    console.error("AI preview error:", err.message);
+    const isAuthError = err.status === 401 || err.message?.includes("API key");
+    return json(
+      {
+        error: isAuthError
+          ? "AI service is not configured. Please contact the app developer."
+          : "Couldn't generate a fix right now. Try again in a moment.",
+      },
+      { status: 500 },
+    );
   }
 }

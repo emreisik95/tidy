@@ -23,17 +23,25 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  const job = await fixQueue.add(
-    "apply-fix",
-    {
-      issueId,
-      productGid,
-      shopDomain: session.shop,
-      accessToken: session.accessToken!,
-      issueType,
-    },
-    { jobId: `fix-${issueId}` },
-  );
+  try {
+    const job = await fixQueue.add(
+      "apply-fix",
+      {
+        issueId,
+        productGid,
+        shopDomain: session.shop,
+        accessToken: session.accessToken!,
+        issueType,
+      },
+      { jobId: `fix-${issueId}` },
+    );
 
-  return json({ jobId: job.id, status: "queued" });
+    return json({ jobId: job.id, status: "queued" });
+  } catch (err: any) {
+    console.error("Fix queue error:", err.message);
+    return json(
+      { error: "Couldn't queue the fix. Try again in a moment." },
+      { status: 500 },
+    );
+  }
 }
