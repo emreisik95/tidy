@@ -2,7 +2,7 @@
 
 client_id = "12a27c4c7dacedb33d32be3bd5d73327"
 name = "Tidy"
-application_url = "https://shopify.dev/apps/default-app-home"
+application_url = "https://tidy.emre.zip"
 embedded = true
 
 [build]
@@ -24,8 +24,7 @@ api_version = "2026-04"
   uri = "/webhooks/bulk-operations-finish"
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_products,write_products"
 
 [auth]
-redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+redirect_urls = [ "https://tidy.emre.zip/auth/callback" ]
