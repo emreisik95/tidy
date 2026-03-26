@@ -8,13 +8,14 @@ import {
   Button,
   BlockStack,
   InlineStack,
-  InlineGrid,
   Banner,
   Spinner,
   Badge,
+  Box,
+  List,
   Divider,
+  EmptyState,
 } from "@shopify/polaris";
-import { CheckCircleIcon } from "@shopify/polaris-icons";
 import { useEffect, useCallback, useState } from "react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -83,129 +84,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 
-function StepItem({
-  number,
-  icon,
-  title,
-  description,
-}: {
-  number: string;
-  icon: any;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Card>
-      <BlockStack gap="300">
-        <InlineStack gap="200" blockAlign="center">
-          <Text as="span" variant="headingLg" tone="subdued">
-            {number}
-          </Text>
-          <Text as="h3" variant="headingSm">
-            {title}
-          </Text>
-        </InlineStack>
-        <Text as="p" variant="bodySm" tone="subdued">
-          {description}
-        </Text>
-      </BlockStack>
-    </Card>
-  );
-}
-
-function OnboardingView({ onScan, isScanning }: { onScan: () => void; isScanning: boolean }) {
-  return (
-    <Page title="Tidy">
-      <BlockStack gap="600">
-        {/* Hero */}
-        <Card>
-          <BlockStack gap="400">
-            <Text as="h2" variant="headingLg">
-              Your products have blind spots.
-            </Text>
-            <Text as="p" variant="bodyMd">
-              Missing alt text, empty SEO fields, no Google categories —
-              these gaps cost you traffic and sales. Tidy checks every
-              product in your catalog and tells you exactly what to fix.
-            </Text>
-            <Box>
-              <Button variant="primary" size="large" onClick={onScan} loading={isScanning}>
-                Scan my products
-              </Button>
-            </Box>
-          </BlockStack>
-        </Card>
-
-        {/* How it works - 3 steps in a grid */}
-        <BlockStack gap="300">
-          <Text as="h2" variant="headingMd">
-            How it works
-          </Text>
-          <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
-            <StepItem
-              number="1"
-              icon={SearchIcon}
-              title="Scan"
-              description="Tidy pulls every product and checks 11 data points: titles, descriptions, images, alt text, SEO fields, categories, barcodes, and tags."
-            />
-            <StepItem
-              number="2"
-              icon={AlertTriangleIcon}
-              title="See what's broken"
-              description="Each product gets a score out of 100. You'll see exactly which fields are empty, which images lack alt text, and what Google will reject."
-            />
-            <StepItem
-              number="3"
-              icon={MagicIcon}
-              title="Fix with one click"
-              description="AI writes your missing descriptions, SEO titles, alt text, and tags. Review, apply, move on. No spreadsheets, no freelancers."
-            />
-          </InlineGrid>
-        </BlockStack>
-
-        {/* Why it matters */}
-        <Card>
-          <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">
-              Why this matters
-            </Text>
-            <Divider />
-            <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
-              <BlockStack gap="100">
-                <Text as="p" variant="headingSm">
-                  Google Merchant Center
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Missing categories and GTINs get your products
-                  disapproved. No Shopping ads, no sales.
-                </Text>
-              </BlockStack>
-              <BlockStack gap="100">
-                <Text as="p" variant="headingSm">
-                  Search rankings
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Empty SEO titles and descriptions mean Google has nothing
-                  to show. Your products stay invisible.
-                </Text>
-              </BlockStack>
-              <BlockStack gap="100">
-                <Text as="p" variant="headingSm">
-                  AI shopping
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  ChatGPT, Perplexity, and Google AI need structured data
-                  to recommend products. Gaps mean you're skipped.
-                </Text>
-              </BlockStack>
-            </InlineGrid>
-          </BlockStack>
-        </Card>
-      </BlockStack>
-    </Page>
-  );
-}
-
 export default function Dashboard() {
   const { scan, issueList, totalIssues, lowestProducts } =
     useLoaderData<typeof loader>();
@@ -227,63 +105,167 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!activeScanId) return;
-
     const interval = setInterval(() => {
       statusFetcher.load(`/app/scan?scanId=${activeScanId}`);
     }, SCAN_POLL_INTERVAL_MS);
-
     return () => clearInterval(interval);
   }, [activeScanId]);
 
   useEffect(() => {
     const scanData = statusFetcher.data?.scan;
-    if (
-      scanData?.status === "completed" ||
-      scanData?.status === "failed"
-    ) {
+    if (scanData?.status === "completed" || scanData?.status === "failed") {
       setActiveScanId(null);
       window.location.reload();
     }
   }, [statusFetcher.data]);
 
-  // Show onboarding if no scan has been run yet
+  // ── First run: no scan yet ──
   if (!scan) {
-    return <OnboardingView onScan={handleScan} isScanning={isScanning} />;
-  }
-
-  // Scanning in progress
-  if (isScanning || scan.status === "running" || scan.status === "pending") {
     return (
       <Page title="Tidy">
         <Layout>
           <Layout.Section>
             <Card>
-              <BlockStack gap="400" inlineAlign="center">
-                <Spinner size="large" />
-                <Text as="h2" variant="headingMd">
-                  Checking your products...
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  This usually takes less than a minute. We're going through
-                  every product in your catalog.
-                </Text>
-              </BlockStack>
+              <EmptyState
+                heading="Check your product data for problems"
+                action={{
+                  content: "Scan my products",
+                  onAction: handleScan,
+                  loading: isScanning,
+                }}
+                image=""
+                fullWidth
+              >
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyMd">
+                    Tidy reads every product in your store and checks for
+                    missing or incomplete data that hurts your visibility
+                    on Google, in search results, and on AI shopping platforms.
+                  </Text>
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    What gets checked:
+                  </Text>
+                  <List>
+                    <List.Item>Image alt text</List.Item>
+                    <List.Item>SEO titles and descriptions</List.Item>
+                    <List.Item>Product descriptions</List.Item>
+                    <List.Item>Google product categories</List.Item>
+                    <List.Item>Barcodes, tags, vendor info</List.Item>
+                  </List>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Takes under a minute. Nothing is changed in your store until you say so.
+                  </Text>
+                </BlockStack>
+              </EmptyState>
             </Card>
+          </Layout.Section>
+
+          <Layout.Section variant="oneThird">
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingSm">
+                    After the scan
+                  </Text>
+                  <List>
+                    <List.Item>
+                      Each product gets a score out of 100
+                    </List.Item>
+                    <List.Item>
+                      You see exactly which fields are empty
+                    </List.Item>
+                    <List.Item>
+                      AI can write your missing content in one click
+                    </List.Item>
+                  </List>
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingSm">
+                    Common problems Tidy finds
+                  </Text>
+                  <List>
+                    <List.Item>
+                      Products disapproved in Google Merchant Center
+                    </List.Item>
+                    <List.Item>
+                      Images without alt text (bad for SEO and accessibility)
+                    </List.Item>
+                    <List.Item>
+                      Missing SEO metadata (invisible in search results)
+                    </List.Item>
+                  </List>
+                </BlockStack>
+              </Card>
+            </BlockStack>
           </Layout.Section>
         </Layout>
       </Page>
     );
   }
 
-  // Results dashboard
+  // ── Scanning in progress ──
+  if (isScanning || scan.status === "running" || scan.status === "pending") {
+    return (
+      <Page title="Tidy">
+        <Layout>
+          <Layout.Section>
+            <Banner tone="info">
+              <InlineStack gap="300" blockAlign="center">
+                <Spinner size="small" />
+                <Text as="span" variant="bodyMd">
+                  Scanning your products. This takes under a minute.
+                </Text>
+              </InlineStack>
+            </Banner>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
+
+  // ── Scan failed ──
+  if (scan.status === "failed") {
+    return (
+      <Page
+        title="Tidy"
+        primaryAction={{
+          content: "Try again",
+          onAction: handleScan,
+        }}
+      >
+        <Layout>
+          <Layout.Section>
+            <Banner tone="critical" title="Scan failed">
+              <p>
+                Something went wrong while scanning your products.
+                This can happen if another scan is already running.
+                Wait a moment and try again.
+              </p>
+            </Banner>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
+
+  // ── Results dashboard ──
   return (
     <Page
       title="Tidy"
       primaryAction={{
-        content: "Re-scan products",
+        content: "Re-scan",
         onAction: handleScan,
         loading: isScanning,
       }}
+      secondaryActions={[
+        {
+          content: "View all products",
+          url: "/app/products",
+        },
+      ]}
     >
       <Layout>
         <Layout.Section>
@@ -294,58 +276,57 @@ export default function Dashboard() {
               issueCount={totalIssues}
             />
 
-            {issueList.length > 0 && (
-              <IssueBreakdown issues={issueList} />
-            )}
-
-            {lowestProducts.length > 0 && (
-              <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    Products that need the most work
-                  </Text>
-                  <Divider />
-                  {lowestProducts.map((p) => (
-                    <InlineStack
-                      key={p.id}
-                      align="space-between"
-                      blockAlign="center"
-                    >
-                      <BlockStack gap="050">
-                        <Link
-                          to={`/app/products/${encodeURIComponent(p.id)}`}
-                        >
-                          <Text as="span" variant="bodyMd" fontWeight="semibold">
-                            {p.title}
-                          </Text>
-                        </Link>
-                        <Text as="span" variant="bodySm" tone="subdued">
-                          {p.issueCount} {p.issueCount === 1 ? "issue" : "issues"}
-                        </Text>
-                      </BlockStack>
-                      <Badge
-                        tone={
-                          p.score >= 80
-                            ? "success"
-                            : p.score >= 50
-                              ? "warning"
-                              : "critical"
-                        }
-                      >
-                        {p.score}/100
-                      </Badge>
-                    </InlineStack>
-                  ))}
-                </BlockStack>
-              </Card>
-            )}
-
-            {totalIssues === 0 && (
-              <Banner tone="success" icon={CheckCircleIcon}>
-                <p>All products look good. No issues found.</p>
-              </Banner>
-            )}
+            {issueList.length > 0 && <IssueBreakdown issues={issueList} />}
           </BlockStack>
+        </Layout.Section>
+
+        <Layout.Section variant="oneThird">
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingSm">
+                Worst scores
+              </Text>
+              <Divider />
+              {lowestProducts.length > 0 ? (
+                lowestProducts.map((p) => (
+                  <InlineStack
+                    key={p.id}
+                    align="space-between"
+                    blockAlign="center"
+                  >
+                    <BlockStack gap="050">
+                      <Link
+                        to={`/app/products/${encodeURIComponent(p.id)}`}
+                      >
+                        <Text as="span" variant="bodySm" fontWeight="semibold">
+                          {p.title}
+                        </Text>
+                      </Link>
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        {p.issueCount}{" "}
+                        {p.issueCount === 1 ? "issue" : "issues"}
+                      </Text>
+                    </BlockStack>
+                    <Badge
+                      tone={
+                        p.score >= 80
+                          ? "success"
+                          : p.score >= 50
+                            ? "warning"
+                            : "critical"
+                      }
+                    >
+                      {p.score}
+                    </Badge>
+                  </InlineStack>
+                ))
+              ) : (
+                <Text as="p" variant="bodySm" tone="subdued">
+                  No issues found.
+                </Text>
+              )}
+            </BlockStack>
+          </Card>
         </Layout.Section>
       </Layout>
     </Page>
