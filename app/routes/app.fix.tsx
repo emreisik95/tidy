@@ -130,15 +130,18 @@ export async function action({ request }: ActionFunctionArgs) {
       }
 
       case "missing_category": {
-        const cat = await ai.suggestCategory(title, description, productType);
+        const categoryGid = formData.get("categoryGid") as string;
+        if (!categoryGid) {
+          return json({ error: "No category selected" }, { status: 400 });
+        }
         await admin.graphql(
           `mutation($input: ProductInput!) {
             productUpdate(input: $input) {
-              product { id }
+              product { id category { id fullName } }
               userErrors { field message }
             }
           }`,
-          { variables: { input: { id: productGid, productCategory: { productTaxonomyNodeId: cat.categoryId } } } },
+          { variables: { input: { id: productGid, category: categoryGid } } },
         );
         break;
       }

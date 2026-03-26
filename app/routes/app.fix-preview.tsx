@@ -92,8 +92,40 @@ export async function action({ request }: ActionFunctionArgs) {
         break;
       }
       case "missing_category": {
-        const cat = await ai.suggestCategory(title, description, productType);
-        preview = { type: "category", value: cat };
+        // AI suggests a name, then we search Shopify taxonomy for real GID
+        const suggestedName = await ai.suggestCategoryName(title, description, productType);
+        const searchTerms = suggestedName.split(">").pop()?.trim() || suggestedName;
+
+        const taxResponse = await admin.graphql(
+          `query TaxSearch($query: String!) {
+            taxonomy {
+              categories(first: 5, search: $query) {
+                nodes {
+                  id
+                  name
+                  fullName
+                  isLeaf
+                }
+              }
+            }
+          }`,
+          { variables: { query: searchTerms } },
+        );
+        const taxData = await taxResponse.json();
+        const matches = taxData.data?.taxonomy?.categories?.nodes || [];
+
+        preview = {
+          type: "category",
+          value: {
+            aiSuggestion: suggestedName,
+            matches: matches.map((m: any) => ({
+              id: m.id,
+              name: m.name,
+              fullName: m.fullName,
+              isLeaf: m.isLeaf,
+            })),
+          },
+        };
         break;
       }
       default:

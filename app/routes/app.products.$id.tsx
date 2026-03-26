@@ -176,23 +176,7 @@ function PreviewContent({ data }: { data: any }) {
   }
 
   if (type === "category") {
-    return (
-      <BlockStack gap="200">
-        <Text as="h3" variant="headingSm">Suggested category</Text>
-        <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-          <BlockStack gap="100">
-            <Text as="p" variant="bodyMd" fontWeight="bold">{value.categoryName}</Text>
-            <Text as="p" variant="bodySm" tone="subdued">
-              Taxonomy ID: {value.categoryId}
-            </Text>
-          </BlockStack>
-        </Box>
-        <Text as="p" variant="bodySm" tone="subdued">
-          This sets your product's Google/Shopify category for tax calculations,
-          search filters, and Google Merchant Center compliance.
-        </Text>
-      </BlockStack>
-    );
+    return null; // Category has its own special UI with selectable options
   }
 
   return null;
@@ -207,6 +191,7 @@ export default function ProductDetail() {
     issueId: string;
     issueType: string;
   } | null>(null);
+  const [selectedCategoryGid, setSelectedCategoryGid] = useState<string | null>(null);
 
   const isGenerating = previewFetcher.state !== "idle";
   const isFixing = fixFetcher.state !== "idle";
@@ -229,17 +214,19 @@ export default function ProductDetail() {
     [productGid, previewFetcher],
   );
 
-  const handleApply = useCallback(() => {
+  const handleApply = useCallback((extraData?: Record<string, string>) => {
     if (!activePreview) return;
     fixFetcher.submit(
       {
         issueId: activePreview.issueId,
         productGid,
         issueType: activePreview.issueType,
+        ...extraData,
       },
       { method: "POST", action: "/app/fix" },
     );
     setActivePreview(null);
+    setSelectedCategoryGid(null);
   }, [activePreview, productGid, fixFetcher]);
 
   if (!product) {
@@ -457,25 +444,71 @@ export default function ProductDetail() {
                             borderRadius="200"
                           >
                             <BlockStack gap="300">
-                              <PreviewContent data={previewFetcher.data} />
+                              {/* Category has its own selectable UI */}
+                              {previewFetcher.data.preview.type === "category" ? (
+                                <BlockStack gap="300">
+                                  <Text as="h3" variant="headingSm">
+                                    AI suggestion: {previewFetcher.data.preview.value.aiSuggestion}
+                                  </Text>
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    Pick a matching Shopify taxonomy category:
+                                  </Text>
+                                  {previewFetcher.data.preview.value.matches.map((m: any) => (
+                                    <InlineStack
+                                      key={m.id}
+                                      align="space-between"
+                                      blockAlign="center"
+                                    >
+                                      <BlockStack gap="050">
+                                        <Text as="span" variant="bodyMd" fontWeight={selectedCategoryGid === m.id ? "bold" : "regular"}>
+                                          {m.fullName}
+                                        </Text>
+                                        {m.isLeaf && (
+                                          <Text as="span" variant="bodySm" tone="subdued">Most specific</Text>
+                                        )}
+                                      </BlockStack>
+                                      <Button
+                                        size="slim"
+                                        variant={selectedCategoryGid === m.id ? "primary" : "secondary"}
+                                        onClick={() => setSelectedCategoryGid(m.id)}
+                                      >
+                                        {selectedCategoryGid === m.id ? "Selected" : "Select"}
+                                      </Button>
+                                    </InlineStack>
+                                  ))}
+                                  {previewFetcher.data.preview.value.matches.length === 0 && (
+                                    <Text as="p" variant="bodySm" tone="critical">
+                                      No matching categories found. Try regenerating.
+                                    </Text>
+                                  )}
+                                </BlockStack>
+                              ) : (
+                                <PreviewContent data={previewFetcher.data} />
+                              )}
+
                               <InlineStack gap="200">
-                                <Button
-                                  variant="primary"
-                                  onClick={handleApply}
-                                  loading={isFixing}
-                                >
-                                  Apply this fix
-                                </Button>
-                                <Button
-                                  onClick={() => setActivePreview(null)}
-                                >
+                                {previewFetcher.data.preview.type === "category" ? (
+                                  <Button
+                                    variant="primary"
+                                    onClick={() => handleApply({ categoryGid: selectedCategoryGid || "" })}
+                                    loading={isFixing}
+                                    disabled={!selectedCategoryGid}
+                                  >
+                                    Apply selected category
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="primary"
+                                    onClick={() => handleApply()}
+                                    loading={isFixing}
+                                  >
+                                    Apply this fix
+                                  </Button>
+                                )}
+                                <Button onClick={() => { setActivePreview(null); setSelectedCategoryGid(null); }}>
                                   Cancel
                                 </Button>
-                                <Button
-                                  onClick={() =>
-                                    handlePreview(issue.id, issue.type)
-                                  }
-                                >
+                                <Button onClick={() => handlePreview(issue.id, issue.type)}>
                                   Regenerate
                                 </Button>
                               </InlineStack>

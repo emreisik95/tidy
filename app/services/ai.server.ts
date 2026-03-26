@@ -75,16 +75,16 @@ export async function generateAltText(
   return JSON.parse(response.choices[0].message.content || "{}").altText;
 }
 
-export async function suggestCategory(
+export async function suggestCategoryName(
   title: string,
   description: string,
   productType: string,
-): Promise<{ categoryId: string; categoryName: string }> {
+): Promise<string> {
   const raw = await generate(
-    `You are a Shopify product taxonomy expert. Given a product, suggest the most specific Shopify Standard Product Taxonomy category. Return JSON: {"categoryId": "gid://shopify/TaxonomyCategory/xx-yy-zz", "categoryName": "Human readable name"}. Use real Shopify taxonomy IDs like "aa-1" for Apparel, "aa-1-1" for Shirts, "el-1" for Electronics, etc. Be as specific as possible.`,
-    `Suggest a category for:\nProduct: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 300)}`,
+    `You are a product categorization expert. Suggest the most specific product category for the given product. Return a short category path like "Apparel > Men's Clothing > Jeans" or "Health & Beauty > Fragrances > Men's Cologne". Be specific. Return JSON: {"category": "..."}`,
+    `Categorize this product:\nTitle: ${title}\nType: ${productType}\nDescription: ${description.slice(0, 300)}`,
   );
-  return JSON.parse(raw);
+  return JSON.parse(raw).category;
 }
 
 export async function generateTags(
