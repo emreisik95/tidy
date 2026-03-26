@@ -73,7 +73,7 @@ export async function action({ request }: ActionFunctionArgs) {
       case "missing_seo_title":
       case "missing_seo_description":
       case "short_seo_description": {
-        const seo = await ai.generateSeo(title, description, productType, lang);
+        const generated = await ai.generateSeo(title, description, productType, lang);
         await admin.graphql(
           `mutation($input: ProductInput!) {
             productUpdate(input: $input) {
@@ -81,7 +81,17 @@ export async function action({ request }: ActionFunctionArgs) {
               userErrors { field message }
             }
           }`,
-          { variables: { input: { id: productGid, seo } } },
+          {
+            variables: {
+              input: {
+                id: productGid,
+                seo: {
+                  title: generated.seoTitle,
+                  description: generated.seoDescription,
+                },
+              },
+            },
+          },
         );
         break;
       }
