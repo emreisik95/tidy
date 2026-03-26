@@ -13,7 +13,10 @@ import {
   Divider,
   Thumbnail,
   ProgressBar,
+  Modal,
+  Box,
 } from "@shopify/polaris";
+import { useState, useCallback } from "react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
@@ -39,7 +42,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       })
     : null;
 
-  // Fetch live product data from Shopify
   const productResponse = await admin.graphql(
     `
     query Product($id: ID!) {
@@ -115,9 +117,102 @@ function formatIssueType(type: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function PreviewContent({ data }: { data: any }) {
+  if (!data?.preview) return null;
+  const { type, value } = data.preview;
+
+  if (type === "description") {
+    return (
+      <BlockStack gap="200">
+        <Text as="h3" variant="headingSm">Generated description</Text>
+        <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+          <Text as="p" variant="bodyMd">{value}</Text>
+        </Box>
+      </BlockStack>
+    );
+  }
+
+  if (type === "seo") {
+    return (
+      <BlockStack gap="300">
+        <Text as="h3" variant="headingSm">Generated SEO metadata</Text>
+        <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+          <BlockStack gap="200">
+            <Text as="p" variant="bodyMd" fontWeight="bold">{value.seoTitle}</Text>
+            <Text as="p" variant="bodySm" tone="subdued">{value.seoDescription}</Text>
+          </BlockStack>
+        </Box>
+      </BlockStack>
+    );
+  }
+
+  if (type === "alt_text") {
+    return (
+      <BlockStack gap="300">
+        <Text as="h3" variant="headingSm">Generated alt text</Text>
+        {value.map((item: any, i: number) => (
+          <InlineStack key={i} gap="300" blockAlign="start">
+            <Thumbnail source={item.imageUrl} alt="" size="small" />
+            <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+              <Text as="p" variant="bodySm">{item.altText}</Text>
+            </Box>
+          </InlineStack>
+        ))}
+      </BlockStack>
+    );
+  }
+
+  if (type === "tags") {
+    return (
+      <BlockStack gap="200">
+        <Text as="h3" variant="headingSm">Generated tags</Text>
+        <InlineStack gap="200" wrap>
+          {value.map((tag: string) => (
+            <Badge key={tag}>{tag}</Badge>
+          ))}
+        </InlineStack>
+      </BlockStack>
+    );
+  }
+
+  return null;
+}
+
 export default function ProductDetail() {
   const { productGid, product, score } = useLoaderData<typeof loader>();
+  const previewFetcher = useFetcher<{ preview?: any; error?: string }>();
   const fixFetcher = useFetcher();
+  const [activePreview, setActivePreview] = useState<{
+    issueId: string;
+    issueType: string;
+  } | null>(null);
+
+  const isGenerating = previewFetcher.state !== "idle";
+  const isFixing = fixFetcher.state !== "idle";
+
+  const handlePreview = useCallback(
+    (issueId: string, issueType: string) => {
+      setActivePreview({ issueId, issueType });
+      previewFetcher.submit(
+        { productGid, issueType },
+        { method: "POST", action: "/app/fix-preview" },
+      );
+    },
+    [productGid, previewFetcher],
+  );
+
+  const handleApply = useCallback(() => {
+    if (!activePreview) return;
+    fixFetcher.submit(
+      {
+        issueId: activePreview.issueId,
+        productGid,
+        issueType: activePreview.issueType,
+      },
+      { method: "POST", action: "/app/fix" },
+    );
+    setActivePreview(null);
+  }, [activePreview, productGid, fixFetcher]);
 
   if (!product) {
     return (
@@ -129,9 +224,8 @@ export default function ProductDetail() {
     );
   }
 
-  const unfixedIssues =
-    score?.issues.filter((i) => !i.fixedAt) || [];
-  const fixableIssues = unfixedIssues.filter((i) => i.aiFixable);
+  const unfixedIssues = score?.issues.filter((i) => !i.fixedAt) || [];
+  const fixedIssues = score?.issues.filter((i) => i.fixedAt) || [];
 
   return (
     <Page
@@ -140,6 +234,7 @@ export default function ProductDetail() {
       backAction={{ url: "/app/products" }}
     >
       <Layout>
+        {/* Left: Product info */}
         <Layout.Section variant="oneThird">
           <BlockStack gap="400">
             <Card>
@@ -151,60 +246,64 @@ export default function ProductDetail() {
                     size="large"
                   />
                 )}
-                <Text as="h3" variant="headingSm">
-                  Product Info
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Vendor: {product.vendor || "Not set"}
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Type: {product.productType || "Not set"}
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Tags: {product.tags.length > 0 ? product.tags.join(", ") : "None"}
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Images: {product.imageCount}
-                </Text>
+                <Divider />
+                <BlockStack gap="200">
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm" tone="subdued">Vendor</Text>
+                    <Text as="span" variant="bodySm">{product.vendor || "Not set"}</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm" tone="subdued">Type</Text>
+                    <Text as="span" variant="bodySm">{product.productType || "Not set"}</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm" tone="subdued">Tags</Text>
+                    <Text as="span" variant="bodySm">
+                      {product.tags.length > 0 ? product.tags.join(", ") : "None"}
+                    </Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm" tone="subdued">Images</Text>
+                    <Text as="span" variant="bodySm">{product.imageCount}</Text>
+                  </InlineStack>
+                </BlockStack>
               </BlockStack>
             </Card>
 
             {/* SEO Preview */}
             <Card>
               <BlockStack gap="200">
-                <Text as="h3" variant="headingSm">
-                  SEO Preview
-                </Text>
+                <Text as="h3" variant="headingSm">SEO preview</Text>
+                <Divider />
                 <Text
                   as="p"
                   variant="bodyMd"
                   fontWeight="semibold"
                   tone={product.seoTitle ? undefined : "critical"}
                 >
-                  {product.seoTitle || "No SEO title set"}
+                  {product.seoTitle || "No SEO title"}
                 </Text>
                 <Text
                   as="p"
                   variant="bodySm"
                   tone={product.seoDescription ? "subdued" : "critical"}
                 >
-                  {product.seoDescription || "No SEO description set"}
+                  {product.seoDescription || "No SEO description"}
                 </Text>
               </BlockStack>
             </Card>
           </BlockStack>
         </Layout.Section>
 
+        {/* Right: Score + Issues */}
         <Layout.Section>
           <BlockStack gap="400">
-            {/* Score Card */}
+            {/* Score */}
             {score && (
               <Card>
                 <BlockStack gap="300">
                   <InlineStack align="space-between">
-                    <Text as="h2" variant="headingMd">
-                      Completeness Score
-                    </Text>
+                    <Text as="h2" variant="headingMd">Health score</Text>
                     <Text
                       as="p"
                       variant="headingLg"
@@ -234,105 +333,132 @@ export default function ProductDetail() {
               </Card>
             )}
 
-            {/* Fix All Button */}
-            {fixableIssues.length > 0 && (
-              <Banner tone="warning">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="span">
-                    {fixableIssues.length} issues can be fixed with AI
-                  </Text>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      for (const issue of fixableIssues) {
-                        fixFetcher.submit(
-                          {
-                            issueId: issue.id,
-                            productGid,
-                            issueType: issue.type,
-                          },
-                          { method: "POST", action: "/app/fix" },
-                        );
-                      }
-                    }}
-                    loading={fixFetcher.state !== "idle"}
-                  >
-                    Fix all with AI
-                  </Button>
-                </InlineStack>
+            {/* Fix applied banner */}
+            {fixFetcher.data && (
+              <Banner tone="success" title="Fix applied">
+                <p>The AI fix has been queued and will be applied shortly. Re-scan to see updated scores.</p>
               </Banner>
             )}
 
-            {/* Issues List */}
-            {unfixedIssues.length > 0 ? (
+            {/* Issues */}
+            {unfixedIssues.length > 0 && (
               <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
                     Issues ({unfixedIssues.length})
                   </Text>
+                  <Divider />
                   {unfixedIssues.map((issue) => (
-                    <div key={issue.id}>
-                      <InlineStack
-                        align="space-between"
-                        blockAlign="center"
-                        gap="200"
-                      >
-                        <BlockStack gap="100">
-                          <InlineStack gap="200" blockAlign="center">
-                            <Badge
-                              tone={
-                                issue.severity === "critical"
-                                  ? "critical"
-                                  : issue.severity === "warning"
-                                    ? "warning"
-                                    : "info"
-                              }
-                            >
-                              {issue.severity}
-                            </Badge>
+                    <BlockStack key={issue.id} gap="200">
+                      <InlineStack align="space-between" blockAlign="center">
+                        <InlineStack gap="200" blockAlign="center">
+                          <Badge
+                            tone={
+                              issue.severity === "critical"
+                                ? "critical"
+                                : issue.severity === "warning"
+                                  ? "warning"
+                                  : "info"
+                            }
+                          >
+                            {issue.severity}
+                          </Badge>
+                          <BlockStack gap="050">
                             <Text as="span" variant="bodyMd" fontWeight="semibold">
                               {formatIssueType(issue.type)}
                             </Text>
-                          </InlineStack>
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            {issue.message}
-                          </Text>
-                        </BlockStack>
+                            <Text as="span" variant="bodySm" tone="subdued">
+                              {issue.message}
+                            </Text>
+                          </BlockStack>
+                        </InlineStack>
                         {issue.aiFixable && (
                           <Button
                             size="slim"
-                            onClick={() => {
-                              fixFetcher.submit(
-                                {
-                                  issueId: issue.id,
-                                  productGid,
-                                  issueType: issue.type,
-                                },
-                                { method: "POST", action: "/app/fix" },
-                              );
-                            }}
-                            loading={fixFetcher.state !== "idle"}
+                            variant="primary"
+                            onClick={() => handlePreview(issue.id, issue.type)}
+                            loading={
+                              isGenerating &&
+                              activePreview?.issueId === issue.id
+                            }
                           >
-                            Fix with AI
+                            Preview fix
                           </Button>
                         )}
                       </InlineStack>
+
+                      {/* Inline preview */}
+                      {activePreview?.issueId === issue.id &&
+                        previewFetcher.data?.preview && (
+                          <Box
+                            padding="400"
+                            background="bg-surface-secondary"
+                            borderRadius="200"
+                          >
+                            <BlockStack gap="300">
+                              <PreviewContent data={previewFetcher.data} />
+                              <InlineStack gap="200">
+                                <Button
+                                  variant="primary"
+                                  onClick={handleApply}
+                                  loading={isFixing}
+                                >
+                                  Apply this fix
+                                </Button>
+                                <Button
+                                  onClick={() => setActivePreview(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  onClick={() =>
+                                    handlePreview(issue.id, issue.type)
+                                  }
+                                >
+                                  Regenerate
+                                </Button>
+                              </InlineStack>
+                            </BlockStack>
+                          </Box>
+                        )}
+
+                      {activePreview?.issueId === issue.id &&
+                        previewFetcher.data?.error && (
+                          <Banner tone="critical">
+                            <p>{previewFetcher.data.error}</p>
+                          </Banner>
+                        )}
+
                       <Divider />
-                    </div>
+                    </BlockStack>
                   ))}
                 </BlockStack>
               </Card>
-            ) : score ? (
+            )}
+
+            {/* Fixed issues */}
+            {fixedIssues.length > 0 && (
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingSm" tone="subdued">
+                    Fixed ({fixedIssues.length})
+                  </Text>
+                  {fixedIssues.map((issue) => (
+                    <InlineStack key={issue.id} gap="200" blockAlign="center">
+                      <Badge tone="success">fixed</Badge>
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        {formatIssueType(issue.type)}
+                      </Text>
+                    </InlineStack>
+                  ))}
+                </BlockStack>
+              </Card>
+            )}
+
+            {/* No issues */}
+            {unfixedIssues.length === 0 && fixedIssues.length === 0 && (
               <Banner tone="success">
-                <Text as="span">
-                  No issues found. This product looks great!
-                </Text>
-              </Banner>
-            ) : (
-              <Banner tone="info">
-                <Text as="span">
-                  Run a scan from the dashboard to check this product.
-                </Text>
+                <p>No issues found for this product.</p>
               </Banner>
             )}
           </BlockStack>
