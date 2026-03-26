@@ -1,8 +1,8 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { authenticate } from "~/shopify.server";
-import { fixQueue } from "~/lib/queue.server";
-import { getActivePlan } from "~/services/billing.server";
+import { authenticate } from "../shopify.server";
+import { fixQueue } from "../lib/queue.server";
+import { getActivePlan } from "../services/billing.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   const { session } = await authenticate.admin(request);

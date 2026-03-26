@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { authenticate } from "~/shopify.server";
-import { startScan, getScanStatus } from "~/services/scanner.server";
+import { authenticate } from "../shopify.server";
+import { startScan, getScanStatus } from "../services/scanner.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);

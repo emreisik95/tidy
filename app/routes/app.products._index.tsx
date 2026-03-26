@@ -10,8 +10,8 @@ import {
   BlockStack,
   EmptyState,
 } from "@shopify/polaris";
-import { authenticate } from "~/shopify.server";
-import prisma from "~/db.server";
+import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);

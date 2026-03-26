@@ -13,8 +13,8 @@ import {
   Icon,
 } from "@shopify/polaris";
 import { CheckIcon } from "@shopify/polaris-icons";
-import { authenticate, PLANS } from "~/shopify.server";
-import { getActivePlan, type ActivePlan } from "~/services/billing.server";
+import { authenticate, PLANS } from "../shopify.server";
+import { getActivePlan, type ActivePlan } from "../services/billing.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await authenticate.admin(request);

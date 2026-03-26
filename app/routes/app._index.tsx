@@ -13,11 +13,11 @@ import {
   Badge,
 } from "@shopify/polaris";
 import { useEffect, useCallback, useState } from "react";
-import { authenticate } from "~/shopify.server";
-import prisma from "~/db.server";
-import { ScoreCard } from "~/components/ScoreCard";
-import { IssueBreakdown } from "~/components/IssueBreakdown";
-import { SCAN_POLL_INTERVAL_MS } from "~/lib/constants";
+import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
+import { ScoreCard } from "../components/ScoreCard";
+import { IssueBreakdown } from "../components/IssueBreakdown";
+import { SCAN_POLL_INTERVAL_MS } from "../lib/constants";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
