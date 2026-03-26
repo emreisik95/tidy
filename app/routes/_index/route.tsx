@@ -23,6 +23,7 @@ export default function App() {
     <div className={styles.index}>
       <div className={styles.content}>
         <div className={styles.hero}>
+          <img src="/tidy-logo.png" alt="Tidy" className={styles.logo} />
           <h1 className={styles.heading}>Tidy</h1>
           <p className={styles.tagline}>
             Find and fix product data problems in your Shopify store.

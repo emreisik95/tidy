@@ -5,20 +5,26 @@
   min-height: 100vh;
   width: 100%;
   padding: 2rem;
-  background: #fafafa;
+  background: #faf8f5;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #1a1a1a;
+  color: #3d3d3d;
 }
 
 .content {
   max-width: 640px;
   width: 100%;
   display: grid;
-  gap: 3rem;
+  gap: 2.5rem;
 }
 
 .hero {
   text-align: center;
+}
+
+.logo {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 1rem;
 }
 
 .heading {
@@ -26,11 +32,12 @@
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.02em;
+  color: #3d3d3d;
 }
 
 .tagline {
   font-size: 1.1rem;
-  color: #666;
+  color: #888;
   margin: 0.5rem 0 0;
 }
 
@@ -45,7 +52,7 @@
   display: grid;
   gap: 0.3rem;
   font-size: 0.85rem;
-  color: #666;
+  color: #888;
 }
 
 .input {
@@ -55,17 +62,18 @@
   font-size: 0.95rem;
   width: 280px;
   outline: none;
+  background: white;
   transition: border-color 0.15s;
 }
 
 .input:focus {
-  border-color: #1a1a1a;
+  border-color: #c49a3c;
 }
 
 .button {
   padding: 0.6rem 1.2rem;
-  background: #1a1a1a;
-  color: white;
+  background: #3d3d3d;
+  color: #faf8f5;
   border: none;
   border-radius: 8px;
   font-size: 0.95rem;
@@ -75,7 +83,7 @@
 }
 
 .button:hover {
-  background: #333;
+  background: #c49a3c;
 }
 
 .features {
@@ -88,11 +96,12 @@
   font-size: 0.95rem;
   font-weight: 600;
   margin: 0 0 0.4rem;
+  color: #3d3d3d;
 }
 
 .feature p {
   font-size: 0.85rem;
-  color: #666;
+  color: #888;
   margin: 0;
   line-height: 1.5;
 }
