@@ -10,10 +10,9 @@ import {
   Button,
   Badge,
   Divider,
-  Icon,
   Select,
+  List,
 } from "@shopify/polaris";
-import { CheckIcon } from "@shopify/polaris-icons";
 import { useState, useCallback } from "react";
 import { authenticate, PLANS } from "../shopify.server";
 import prisma from "../db.server";
@@ -53,15 +52,8 @@ const LANGUAGES = [
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   const plan = await getActivePlan(request);
-
-  const shop = await prisma.shop.findUnique({
-    where: { domain: session.shop },
-  });
-
-  return json({
-    plan,
-    language: shop?.language || "en",
-  });
+  const shop = await prisma.shop.findUnique({ where: { domain: session.shop } });
+  return json({ plan, language: shop?.language || "en" });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -94,86 +86,6 @@ export async function action({ request }: ActionFunctionArgs) {
   return redirect("/app/settings");
 }
 
-const features: Record<string, { free: boolean; basic: boolean; ai: boolean }> = {
-  "Product scanning": { free: true, basic: true, ai: true },
-  "Completeness scoring": { free: true, basic: true, ai: true },
-  "Issue identification": { free: true, basic: true, ai: true },
-  "Up to 10 products": { free: true, basic: false, ai: false },
-  "Unlimited products": { free: false, basic: true, ai: true },
-  "AI-generated descriptions": { free: false, basic: false, ai: true },
-  "AI-generated SEO metadata": { free: false, basic: false, ai: true },
-  "AI-generated alt text": { free: false, basic: false, ai: true },
-  "AI-generated tags": { free: false, basic: false, ai: true },
-};
-
-function PlanCard({
-  name,
-  price,
-  planKey,
-  currentPlan,
-}: {
-  name: string;
-  price: string;
-  planKey: ActivePlan;
-  currentPlan: ActivePlan;
-}) {
-  const isCurrent = planKey === currentPlan;
-
-  return (
-    <Card>
-      <BlockStack gap="400">
-        <InlineStack align="space-between" blockAlign="center">
-          <BlockStack gap="100">
-            <Text as="h2" variant="headingMd">
-              {name}
-            </Text>
-            <Text as="p" variant="headingLg">
-              {price}
-            </Text>
-          </BlockStack>
-          {isCurrent && <Badge tone="success">Current plan</Badge>}
-        </InlineStack>
-
-        <Divider />
-
-        <BlockStack gap="200">
-          {Object.entries(features).map(([feature, plans]) => {
-            const included = plans[planKey];
-            return (
-              <InlineStack key={feature} gap="200" blockAlign="center">
-                {included ? (
-                  <Icon source={CheckIcon} tone="success" />
-                ) : (
-                  <Text as="span" tone="subdued">
-                    &mdash;
-                  </Text>
-                )}
-                <Text
-                  as="span"
-                  variant="bodySm"
-                  tone={included ? undefined : "subdued"}
-                >
-                  {feature}
-                </Text>
-              </InlineStack>
-            );
-          })}
-        </BlockStack>
-
-        {!isCurrent && planKey !== "free" && (
-          <Form method="post">
-            <input type="hidden" name="intent" value="plan" />
-            <input type="hidden" name="plan" value={planKey} />
-            <Button submit variant="primary" fullWidth>
-              Upgrade to {name}
-            </Button>
-          </Form>
-        )}
-      </BlockStack>
-    </Card>
-  );
-}
-
 export default function Settings() {
   const { plan, language } = useLoaderData<typeof loader>();
   const submit = useSubmit();
@@ -193,10 +105,9 @@ export default function Settings() {
   return (
     <Page title="Settings" backAction={{ url: "/app" }}>
       <Layout>
-        {/* Language */}
         <Layout.AnnotatedSection
           title="Content language"
-          description="AI-generated content (descriptions, SEO, alt text, tags) will be written in this language."
+          description="AI-generated content will be written in this language."
         >
           <Card>
             <Select
@@ -208,30 +119,75 @@ export default function Settings() {
           </Card>
         </Layout.AnnotatedSection>
 
-        {/* Plans */}
         <Layout.AnnotatedSection
           title="Plan"
           description="Choose the plan that fits your store."
         >
           <BlockStack gap="400">
-            <PlanCard
-              name="Free"
-              price="$0/mo"
-              planKey="free"
-              currentPlan={plan}
-            />
-            <PlanCard
-              name="Basic"
-              price="$4.99/mo"
-              planKey="basic"
-              currentPlan={plan}
-            />
-            <PlanCard
-              name="AI"
-              price="$9.99/mo"
-              planKey="ai"
-              currentPlan={plan}
-            />
+            {/* Free */}
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <BlockStack gap="050">
+                    <Text as="h2" variant="headingMd">Free</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">$0/mo</Text>
+                  </BlockStack>
+                  {plan === "free" && <Badge tone="success">Current</Badge>}
+                </InlineStack>
+                <Text as="p" variant="bodySm">
+                  Scan up to 10 products. See completeness scores and issues.
+                </Text>
+              </BlockStack>
+            </Card>
+
+            {/* Basic */}
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <BlockStack gap="050">
+                    <Text as="h2" variant="headingMd">Basic</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">$4.99/mo</Text>
+                  </BlockStack>
+                  {plan === "basic" ? (
+                    <Badge tone="success">Current</Badge>
+                  ) : plan === "free" ? (
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="plan" />
+                      <input type="hidden" name="plan" value="basic" />
+                      <Button submit size="slim">Upgrade</Button>
+                    </Form>
+                  ) : null}
+                </InlineStack>
+                <Text as="p" variant="bodySm">
+                  Everything in Free, plus unlimited product scanning.
+                </Text>
+              </BlockStack>
+            </Card>
+
+            {/* AI */}
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <BlockStack gap="050">
+                    <Text as="h2" variant="headingMd">AI</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">$9.99/mo</Text>
+                  </BlockStack>
+                  {plan === "ai" ? (
+                    <Badge tone="success">Current</Badge>
+                  ) : (
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="plan" />
+                      <input type="hidden" name="plan" value="ai" />
+                      <Button submit size="slim" variant="primary">Upgrade</Button>
+                    </Form>
+                  )}
+                </InlineStack>
+                <Text as="p" variant="bodySm">
+                  Everything in Basic, plus AI-generated descriptions, SEO
+                  titles, alt text, and tags with one-click apply.
+                </Text>
+              </BlockStack>
+            </Card>
           </BlockStack>
         </Layout.AnnotatedSection>
       </Layout>
