@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher, useRevalidator } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -181,7 +181,8 @@ function PreviewContent({ data }: { data: any }) {
 export default function ProductDetail() {
   const { productGid, product, score } = useLoaderData<typeof loader>();
   const previewFetcher = useFetcher<{ preview?: any; error?: string }>();
-  const fixFetcher = useFetcher();
+  const fixFetcher = useFetcher<{ success?: boolean; error?: string }>();
+  const revalidator = useRevalidator();
   const [activePreview, setActivePreview] = useState<{
     issueId: string;
     issueType: string;
@@ -189,6 +190,13 @@ export default function ProductDetail() {
 
   const isGenerating = previewFetcher.state !== "idle";
   const isFixing = fixFetcher.state !== "idle";
+
+  // When fix succeeds, revalidate page data
+  const prevFixData = fixFetcher.data;
+  if (prevFixData?.success && activePreview) {
+    setActivePreview(null);
+    revalidator.revalidate();
+  }
 
   const handlePreview = useCallback(
     (issueId: string, issueType: string) => {

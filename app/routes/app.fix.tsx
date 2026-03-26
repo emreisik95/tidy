@@ -1,11 +1,11 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { fixQueue } from "../lib/queue.server";
-import { getActivePlan } from "../services/billing.server";
+import prisma from "../db.server";
+import * as ai from "../services/ai.server";
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const issueId = formData.get("issueId") as string;
   const productGid = formData.get("productGid") as string;
@@ -15,32 +15,129 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: "issueId and productGid are required" }, { status: 400 });
   }
 
-  const plan = await getActivePlan(request);
-  if (plan !== "ai") {
-    return json(
-      { error: "AI fixes require the AI plan ($9.99/mo)" },
-      { status: 403 },
-    );
+  // Get shop language
+  const shop = await prisma.shop.findUnique({ where: { domain: session.shop } });
+  const lang = shop?.language || "en";
+
+  // Fetch current product data
+  const productResponse = await admin.graphql(
+    `query Product($id: ID!) {
+      product(id: $id) {
+        title
+        description
+        productType
+        tags
+        media(first: 20) {
+          edges {
+            node {
+              ... on MediaImage {
+                id
+                alt
+                image { url }
+              }
+            }
+          }
+        }
+      }
+    }`,
+    { variables: { id: productGid } },
+  );
+  const productData = await productResponse.json();
+  const product = productData.data?.product;
+
+  if (!product) {
+    return json({ error: "Product not found" }, { status: 404 });
   }
 
   try {
-    const job = await fixQueue.add(
-      "apply-fix",
-      {
-        issueId,
-        productGid,
-        shopDomain: session.shop,
-        accessToken: session.accessToken!,
-        issueType,
-      },
-      { jobId: `fix-${issueId}` },
-    );
+    const title = product.title;
+    const description = product.description || "";
+    const productType = product.productType || "";
 
-    return json({ jobId: job.id, status: "queued" });
+    switch (issueType) {
+      case "missing_description":
+      case "short_description": {
+        const generated = await ai.generateDescription(title, productType, description, lang);
+        await admin.graphql(
+          `mutation($input: ProductInput!) {
+            productUpdate(input: $input) {
+              product { id }
+              userErrors { field message }
+            }
+          }`,
+          { variables: { input: { id: productGid, descriptionHtml: `<p>${generated}</p>` } } },
+        );
+        break;
+      }
+
+      case "missing_seo_title":
+      case "missing_seo_description":
+      case "short_seo_description": {
+        const seo = await ai.generateSeo(title, description, productType, lang);
+        await admin.graphql(
+          `mutation($input: ProductInput!) {
+            productUpdate(input: $input) {
+              product { id }
+              userErrors { field message }
+            }
+          }`,
+          { variables: { input: { id: productGid, seo } } },
+        );
+        break;
+      }
+
+      case "missing_alt_text": {
+        const images = product.media.edges
+          .filter((e: any) => e.node.image && !e.node.alt?.trim());
+        const mediaUpdates = await Promise.all(
+          images.map(async (e: any) => ({
+            id: e.node.id,
+            alt: await ai.generateAltText(e.node.image.url, title, lang),
+          })),
+        );
+        if (mediaUpdates.length > 0) {
+          await admin.graphql(
+            `mutation($productId: ID!, $media: [UpdateMediaInput!]!) {
+              productUpdateMedia(productId: $productId, media: $media) {
+                media { id alt }
+                userErrors { field message }
+              }
+            }`,
+            { variables: { productId: productGid, media: mediaUpdates } },
+          );
+        }
+        break;
+      }
+
+      case "no_tags": {
+        const tags = await ai.generateTags(title, description, productType, lang);
+        await admin.graphql(
+          `mutation($input: ProductInput!) {
+            productUpdate(input: $input) {
+              product { id }
+              userErrors { field message }
+            }
+          }`,
+          { variables: { input: { id: productGid, tags } } },
+        );
+        break;
+      }
+
+      default:
+        return json({ error: `Cannot fix ${issueType}` }, { status: 400 });
+    }
+
+    // Mark issue as fixed
+    await prisma.issue.update({
+      where: { id: issueId },
+      data: { fixedAt: new Date() },
+    });
+
+    return json({ success: true, issueId, issueType });
   } catch (err: any) {
-    console.error("Fix queue error:", err.message);
+    console.error("Fix error:", err.message);
     return json(
-      { error: "Couldn't queue the fix. Try again in a moment." },
+      { error: "Couldn't apply the fix. Try again in a moment." },
       { status: 500 },
     );
   }
