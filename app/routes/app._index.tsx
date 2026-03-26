@@ -19,7 +19,7 @@ import {
 import {
   SearchIcon,
   AlertTriangleIcon,
-  WandIcon,
+  MagicIcon,
   CheckCircleIcon,
 } from "@shopify/polaris-icons";
 import { useEffect, useCallback, useState } from "react";
@@ -167,7 +167,7 @@ function OnboardingView({ onScan, isScanning }: { onScan: () => void; isScanning
             />
             <StepItem
               number="3"
-              icon={WandIcon}
+              icon={MagicIcon}
               tone="success"
               title="Fix with one click"
               description="AI writes your missing descriptions, SEO titles, alt text, and tags. Review, apply, move on. No spreadsheets, no freelancers."
