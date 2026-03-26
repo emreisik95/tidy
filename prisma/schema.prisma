@@ -67,6 +67,7 @@ model Shop {
   id          String   @id @default(cuid())
   domain      String   @unique
   plan        PlanName @default(free)
+  language    String   @default("en")
   billingId   String?
   installedAt DateTime @default(now())
   lastScanAt  DateTime?

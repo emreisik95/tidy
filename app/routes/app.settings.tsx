@@ -1,5 +1,5 @@
 import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Form } from "@remix-run/react";
+import { useLoaderData, Form, useSubmit } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -11,29 +11,84 @@ import {
   Badge,
   Divider,
   Icon,
+  Select,
 } from "@shopify/polaris";
 import { CheckIcon } from "@shopify/polaris-icons";
+import { useState, useCallback } from "react";
 import { authenticate, PLANS } from "../shopify.server";
+import prisma from "../db.server";
 import { getActivePlan, type ActivePlan } from "../services/billing.server";
 
+const LANGUAGES = [
+  { label: "English", value: "en" },
+  { label: "Turkish (Türkçe)", value: "tr" },
+  { label: "German (Deutsch)", value: "de" },
+  { label: "French (Français)", value: "fr" },
+  { label: "Spanish (Español)", value: "es" },
+  { label: "Italian (Italiano)", value: "it" },
+  { label: "Portuguese (Português)", value: "pt" },
+  { label: "Dutch (Nederlands)", value: "nl" },
+  { label: "Japanese (日本語)", value: "ja" },
+  { label: "Korean (한국어)", value: "ko" },
+  { label: "Chinese (中文)", value: "zh" },
+  { label: "Arabic (العربية)", value: "ar" },
+  { label: "Russian (Русский)", value: "ru" },
+  { label: "Polish (Polski)", value: "pl" },
+  { label: "Swedish (Svenska)", value: "sv" },
+  { label: "Danish (Dansk)", value: "da" },
+  { label: "Norwegian (Norsk)", value: "no" },
+  { label: "Finnish (Suomi)", value: "fi" },
+  { label: "Czech (Čeština)", value: "cs" },
+  { label: "Romanian (Română)", value: "ro" },
+  { label: "Hungarian (Magyar)", value: "hu" },
+  { label: "Greek (Ελληνικά)", value: "el" },
+  { label: "Thai (ไทย)", value: "th" },
+  { label: "Vietnamese (Tiếng Việt)", value: "vi" },
+  { label: "Indonesian (Bahasa)", value: "id" },
+  { label: "Hindi (हिन्दी)", value: "hi" },
+  { label: "Hebrew (עברית)", value: "he" },
+  { label: "Ukrainian (Українська)", value: "uk" },
+];
+
 export async function loader({ request }: LoaderFunctionArgs) {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const plan = await getActivePlan(request);
-  return json({ plan });
+
+  const shop = await prisma.shop.findUnique({
+    where: { domain: session.shop },
+  });
+
+  return json({
+    plan,
+    language: shop?.language || "en",
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { billing } = await authenticate.admin(request);
+  const { billing, session } = await authenticate.admin(request);
   const formData = await request.formData();
-  const targetPlan = formData.get("plan") as string;
+  const intent = formData.get("intent") as string;
 
-  if (targetPlan === "basic" || targetPlan === "ai") {
-    const planName = targetPlan === "ai" ? PLANS.AI : PLANS.BASIC;
-    await billing.require({
-      plans: [planName],
-      isTest: true,
-      onFailure: async () => redirect("/app/settings"),
+  if (intent === "language") {
+    const language = formData.get("language") as string;
+    await prisma.shop.upsert({
+      where: { domain: session.shop },
+      update: { language },
+      create: { domain: session.shop, language },
     });
+    return json({ success: true });
+  }
+
+  if (intent === "plan") {
+    const targetPlan = formData.get("plan") as string;
+    if (targetPlan === "basic" || targetPlan === "ai") {
+      const planName = targetPlan === "ai" ? PLANS.AI : PLANS.BASIC;
+      await billing.require({
+        plans: [planName],
+        isTest: true,
+        onFailure: async () => redirect("/app/settings"),
+      });
+    }
   }
 
   return redirect("/app/settings");
@@ -107,6 +162,7 @@ function PlanCard({
 
         {!isCurrent && planKey !== "free" && (
           <Form method="post">
+            <input type="hidden" name="intent" value="plan" />
             <input type="hidden" name="plan" value={planKey} />
             <Button submit variant="primary" fullWidth>
               Upgrade to {name}
@@ -119,40 +175,65 @@ function PlanCard({
 }
 
 export default function Settings() {
-  const { plan } = useLoaderData<typeof loader>();
+  const { plan, language } = useLoaderData<typeof loader>();
+  const submit = useSubmit();
+  const [selectedLang, setSelectedLang] = useState(language);
+
+  const handleLangChange = useCallback(
+    (value: string) => {
+      setSelectedLang(value);
+      const formData = new FormData();
+      formData.set("intent", "language");
+      formData.set("language", value);
+      submit(formData, { method: "post" });
+    },
+    [submit],
+  );
 
   return (
     <Page title="Settings" backAction={{ url: "/app" }}>
       <Layout>
-        <Layout.Section>
-          <Text as="h2" variant="headingLg">
-            Choose your plan
-          </Text>
-        </Layout.Section>
-        <Layout.Section variant="oneThird">
-          <PlanCard
-            name="Free"
-            price="$0/mo"
-            planKey="free"
-            currentPlan={plan}
-          />
-        </Layout.Section>
-        <Layout.Section variant="oneThird">
-          <PlanCard
-            name="Basic"
-            price="$4.99/mo"
-            planKey="basic"
-            currentPlan={plan}
-          />
-        </Layout.Section>
-        <Layout.Section variant="oneThird">
-          <PlanCard
-            name="AI"
-            price="$9.99/mo"
-            planKey="ai"
-            currentPlan={plan}
-          />
-        </Layout.Section>
+        {/* Language */}
+        <Layout.AnnotatedSection
+          title="Content language"
+          description="AI-generated content (descriptions, SEO, alt text, tags) will be written in this language."
+        >
+          <Card>
+            <Select
+              label="Language"
+              options={LANGUAGES}
+              value={selectedLang}
+              onChange={handleLangChange}
+            />
+          </Card>
+        </Layout.AnnotatedSection>
+
+        {/* Plans */}
+        <Layout.AnnotatedSection
+          title="Plan"
+          description="Choose the plan that fits your store."
+        >
+          <BlockStack gap="400">
+            <PlanCard
+              name="Free"
+              price="$0/mo"
+              planKey="free"
+              currentPlan={plan}
+            />
+            <PlanCard
+              name="Basic"
+              price="$4.99/mo"
+              planKey="basic"
+              currentPlan={plan}
+            />
+            <PlanCard
+              name="AI"
+              price="$9.99/mo"
+              planKey="ai"
+              currentPlan={plan}
+            />
+          </BlockStack>
+        </Layout.AnnotatedSection>
       </Layout>
     </Page>
   );
