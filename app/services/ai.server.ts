@@ -17,6 +17,8 @@ WRITING RULES - follow these strictly:
 - Short sentences. Plain words. Write for someone scanning on their phone.
 - Be specific - use numbers and details, not vague claims.
 - No corporate jargon. Write like you're explaining to a friend who runs a small shop.
+- NEVER invent facts. No prices, no measurements, no materials unless explicitly provided in the input. If you don't know it, don't write it.
+- NEVER say "starting at $X", "only $X", "affordable", or any price-related language.
 `;
 
 async function generate(
