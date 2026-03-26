@@ -15,6 +15,7 @@ import {
 } from "@shopify/polaris";
 import { ImageIcon } from "@shopify/polaris-icons";
 import { useEffect, useCallback, useState } from "react";
+import { useRevalidator } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { ScoreCard } from "../components/ScoreCard";
@@ -162,21 +163,24 @@ export default function Dashboard() {
     useLoaderData<typeof loader>();
   const scanFetcher = useFetcher<{ scanId: string }>();
   const statusFetcher = useFetcher<{ scan: { status: string } }>();
+  const revalidator = useRevalidator();
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
 
-  const isScanning = activeScanId !== null;
+  const isScanning = activeScanId !== null || scan?.status === "running" || scan?.status === "pending";
   const hasScanResults = scan?.status === "completed";
 
   const handleScan = useCallback(() => {
     scanFetcher.submit(null, { method: "POST", action: "/app/scan" });
   }, [scanFetcher]);
 
+  // When scan starts, grab the scan ID and start polling
   useEffect(() => {
     if (scanFetcher.data?.scanId) {
       setActiveScanId(scanFetcher.data.scanId);
     }
   }, [scanFetcher.data]);
 
+  // Poll scan status every 3s while scanning
   useEffect(() => {
     if (!activeScanId) return;
     const interval = setInterval(() => {
@@ -185,11 +189,12 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [activeScanId]);
 
+  // When scan completes, revalidate the page data (no full reload)
   useEffect(() => {
     const scanData = statusFetcher.data?.scan;
     if (scanData?.status === "completed" || scanData?.status === "failed") {
       setActiveScanId(null);
-      window.location.reload();
+      revalidator.revalidate();
     }
   }, [statusFetcher.data]);
 

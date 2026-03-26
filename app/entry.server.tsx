@@ -7,6 +7,10 @@ import {
 } from "@remix-run/node";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { ensureWorkersRunning } from "./lib/worker.server";
+
+// Start BullMQ workers once on server boot
+ensureWorkersRunning();
 
 export const streamTimeout = 5000;
 
