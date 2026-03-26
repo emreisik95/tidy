@@ -1,0 +1,22 @@
+# This file stores configurations for your Shopify app.
+
+name = "Tidy"
+client_id = ""
+
+[access_scopes]
+scopes = "read_products,write_products"
+
+[webhooks]
+api_version = "2025-04"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/scopes_update"]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = ["bulk_operations/finish"]
+  uri = "/webhooks/bulk-operations-finish"
