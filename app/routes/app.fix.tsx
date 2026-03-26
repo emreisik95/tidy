@@ -171,14 +171,8 @@ export async function action({ request }: ActionFunctionArgs) {
         return json({ error: `Cannot fix ${issueType}` }, { status: 400 });
     }
 
-    // Mark issue as fixed
-    await prisma.issue.update({
-      where: { id: issueId },
-      data: { fixedAt: new Date() },
-    });
-
-    // Recalculate product score based on remaining unfixed issues
-    await recalculateScore(productGid);
+    // Re-scan this single product to get fresh score
+    await rescanProduct(admin, productGid);
 
     return json({ success: true, issueId, issueType });
   } catch (err: any) {
@@ -190,52 +184,122 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 }
 
-async function recalculateScore(productGid: string) {
-  // Find the latest productScore for this product
-  const productScore = await prisma.productScore.findFirst({
+async function rescanProduct(admin: any, productGid: string) {
+  const { scoreProduct } = await import("../services/scoring.server");
+
+  // Fetch fresh product data from Shopify
+  const response = await admin.graphql(
+    `query Product($id: ID!) {
+      product(id: $id) {
+        id
+        title
+        description
+        descriptionHtml
+        productType
+        vendor
+        tags
+        category { id }
+        seo { title description }
+        media(first: 20) {
+          edges {
+            node {
+              ... on MediaImage {
+                id
+                alt
+                image { url }
+              }
+            }
+          }
+        }
+        variants(first: 100) {
+          edges {
+            node {
+              id
+              barcode
+            }
+          }
+        }
+      }
+    }`,
+    { variables: { id: productGid } },
+  );
+  const data = await response.json();
+  const p = data.data?.product;
+  if (!p) return;
+
+  // Build ScannedProduct shape
+  const scannedProduct = {
+    id: p.id,
+    title: p.title || "",
+    description: p.description || "",
+    descriptionHtml: p.descriptionHtml || "",
+    images: (p.media?.edges || [])
+      .filter((e: any) => e.node.image)
+      .map((e: any) => ({
+        id: e.node.id,
+        altText: e.node.alt || null,
+        url: e.node.image.url,
+      })),
+    seo: {
+      title: p.seo?.title || null,
+      description: p.seo?.description || null,
+    },
+    category: p.category?.id || null,
+    productType: p.productType || "",
+    tags: p.tags || [],
+    vendor: p.vendor || "",
+    variants: (p.variants?.edges || []).map((e: any) => ({
+      id: e.node.id,
+      barcode: e.node.barcode || null,
+    })),
+  };
+
+  // Score it fresh
+  const result = scoreProduct(scannedProduct);
+
+  // Find existing productScore for this product
+  const existing = await prisma.productScore.findFirst({
     where: { productGid },
     orderBy: { createdAt: "desc" },
-    include: { issues: true },
   });
 
-  if (!productScore) return;
+  if (!existing) return;
 
-  // Count weight of remaining unfixed issues
-  const WEIGHTS: Record<string, number> = {
-    missing_title: 10,
-    missing_description: 15,
-    no_images: 10,
-    missing_alt_text: 15,
-    missing_seo_title: 12,
-    missing_seo_description: 12,
-    missing_category: 8,
-    missing_product_type: 5,
-    no_tags: 5,
-    missing_barcode: 5,
-    missing_vendor: 3,
-  };
-  const MAX_WEIGHT = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
+  // Delete old issues, create new ones, update score
+  await prisma.$transaction(async (tx) => {
+    await tx.issue.deleteMany({ where: { productScoreId: existing.id } });
 
-  const unfixedWeight = productScore.issues
-    .filter((i) => !i.fixedAt)
-    .reduce((sum, i) => sum + (WEIGHTS[i.type] || 0), 0);
+    if (result.issues.length > 0) {
+      await tx.issue.createMany({
+        data: result.issues.map((issue) => ({
+          productScoreId: existing.id,
+          type: issue.type as any,
+          severity: issue.severity as any,
+          field: issue.field,
+          message: issue.message,
+          aiFixable: issue.aiFixable,
+        })),
+      });
+    }
 
-  const newScore = Math.round(((MAX_WEIGHT - unfixedWeight) / MAX_WEIGHT) * 100);
+    await tx.productScore.update({
+      where: { id: existing.id },
+      data: {
+        score: result.score,
+        imageCount: scannedProduct.images.length,
+      },
+    });
 
-  await prisma.productScore.update({
-    where: { id: productScore.id },
-    data: { score: newScore },
-  });
-
-  // Also update the scan's overall score
-  const allScores = await prisma.productScore.findMany({
-    where: { scanId: productScore.scanId },
-  });
-  const avgScore = Math.round(
-    allScores.reduce((sum, s) => sum + s.score, 0) / allScores.length,
-  );
-  await prisma.scan.update({
-    where: { id: productScore.scanId },
-    data: { overallScore: avgScore },
+    // Update scan overall score
+    const allScores = await tx.productScore.findMany({
+      where: { scanId: existing.scanId },
+    });
+    const avgScore = Math.round(
+      allScores.reduce((sum, s) => sum + s.score, 0) / allScores.length,
+    );
+    await tx.scan.update({
+      where: { id: existing.scanId },
+      data: { overallScore: avgScore },
+    });
   });
 }
