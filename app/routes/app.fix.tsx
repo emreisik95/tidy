@@ -93,7 +93,17 @@ export async function action({ request }: ActionFunctionArgs) {
             },
           },
         );
-        break;
+        // Mark all SEO-related issues as fixed since we set both
+        await prisma.issue.updateMany({
+          where: {
+            productScore: { productGid },
+            type: { in: ["missing_seo_title", "missing_seo_description", "short_seo_description"] },
+            fixedAt: null,
+          },
+          data: { fixedAt: new Date() },
+        });
+        // Return early -- we already marked all SEO issues
+        return json({ success: true, issueId, issueType });
       }
 
       case "missing_alt_text": {
