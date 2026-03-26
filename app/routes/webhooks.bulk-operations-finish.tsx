@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import { handleBulkOperationComplete } from "../services/scanner.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -7,13 +7,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   console.log(`Received bulk_operations/finish webhook for ${shop}`);
 
-  const { admin_graphql_api_id, status, url } = payload as {
+  const { admin_graphql_api_id } = payload as {
     admin_graphql_api_id: string;
-    status: string;
-    url: string | null;
   };
 
-  await handleBulkOperationComplete(admin_graphql_api_id, url, status, shop);
+  // Get admin API context for this shop (webhook doesn't provide one)
+  const { admin } = await unauthenticated.admin(shop);
+
+  await handleBulkOperationComplete(admin_graphql_api_id, shop, admin);
 
   return new Response();
 };

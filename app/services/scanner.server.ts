@@ -1,5 +1,7 @@
 import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import prisma from "../db.server";
+import { scanQueue } from "../lib/queue.server";
+import { scoreProduct } from "./scoring.server";
 import type { ScannedProduct } from "../lib/types";
 
 const PRODUCTS_BULK_QUERY = `
@@ -96,33 +98,123 @@ export async function getScanStatus(scanId: string) {
 }
 
 export async function handleBulkOperationComplete(
-  bulkOperationId: string,
-  jsonlUrl: string | null,
-  status: string,
+  bulkOperationGid: string,
   shopDomain: string,
+  admin: AdminApiContext,
 ) {
+  // Look up the scan by bulkOperationId
   const scan = await prisma.scan.findFirst({
-    where: { bulkOperationId },
+    where: { bulkOperationId: bulkOperationGid },
   });
 
   if (!scan) {
-    console.warn(`No scan found for bulk operation ${bulkOperationId}`);
+    console.warn(`No scan found for bulk operation ${bulkOperationGid}`);
     return;
   }
 
-  if (status === "COMPLETED" && jsonlUrl) {
-    const { scanQueue } = await import("~/lib/queue.server");
-    await scanQueue.add(
-      "process-scan",
-      { scanId: scan.id, jsonlUrl, shopDomain },
-      { jobId: `scan-${scan.id}` },
-    );
-  } else {
+  // Query Shopify for the actual result URL (webhook doesn't include it)
+  const response = await admin.graphql(
+    `
+    query BulkOpResult($id: ID!) {
+      node(id: $id) {
+        ... on BulkOperation {
+          id
+          status
+          url
+          errorCode
+        }
+      }
+    }
+  `,
+    { variables: { id: bulkOperationGid } },
+  );
+  const data = await response.json();
+  const bulkOp = data.data?.node;
+
+  if (!bulkOp || bulkOp.status !== "COMPLETED" || !bulkOp.url) {
+    console.error(`Bulk operation not completed or no URL: ${bulkOp?.status}`);
     await prisma.scan.update({
       where: { id: scan.id },
       data: { status: "failed" },
     });
+    return;
   }
+
+  // Try enqueue to BullMQ, fallback to inline processing
+  try {
+    await scanQueue.add(
+      "process-scan",
+      { scanId: scan.id, jsonlUrl: bulkOp.url, shopDomain },
+      { jobId: `scan-${scan.id}` },
+    );
+    console.log(`Enqueued scan job for ${scan.id}`);
+  } catch (err) {
+    console.warn("BullMQ unavailable, processing inline:", err);
+    await processInline(scan.id, bulkOp.url);
+  }
+}
+
+async function processInline(scanId: string, jsonlUrl: string) {
+  const res = await fetch(jsonlUrl);
+  if (!res.ok) throw new Error(`Failed to download JSONL: ${res.status}`);
+  const text = await res.text();
+  const products = parseJsonl(text);
+
+  let totalScore = 0;
+
+  await prisma.$transaction(async (tx) => {
+    for (const product of products) {
+      const result = scoreProduct(product);
+      totalScore += result.score;
+
+      const ps = await tx.productScore.create({
+        data: {
+          scanId,
+          productGid: product.id,
+          productTitle: product.title || "(untitled)",
+          score: result.score,
+          maxScore: result.maxScore,
+          imageCount: product.images.length,
+        },
+      });
+
+      if (result.issues.length > 0) {
+        await tx.issue.createMany({
+          data: result.issues.map((issue) => ({
+            productScoreId: ps.id,
+            type: issue.type as any,
+            severity: issue.severity as any,
+            field: issue.field,
+            message: issue.message,
+            aiFixable: issue.aiFixable,
+          })),
+        });
+      }
+    }
+
+    const overallScore = products.length > 0
+      ? Math.round(totalScore / products.length)
+      : 0;
+
+    await tx.scan.update({
+      where: { id: scanId },
+      data: {
+        status: "completed",
+        completedAt: new Date(),
+        totalProducts: products.length,
+        scannedProducts: products.length,
+        overallScore,
+      },
+    });
+
+    const scan = await tx.scan.findUniqueOrThrow({ where: { id: scanId } });
+    await tx.shop.update({
+      where: { id: scan.shopId },
+      data: { lastScanAt: new Date() },
+    });
+  });
+
+  console.log(`Scan ${scanId} completed: ${products.length} products, avg score ${Math.round(totalScore / products.length)}`);
 }
 
 export function parseJsonl(text: string): ScannedProduct[] {
