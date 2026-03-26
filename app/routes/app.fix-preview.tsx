@@ -91,6 +91,11 @@ export async function action({ request }: ActionFunctionArgs) {
         preview = { type: "tags", value: tags };
         break;
       }
+      case "missing_category": {
+        const cat = await ai.suggestCategory(title, description, productType);
+        preview = { type: "category", value: cat };
+        break;
+      }
       default:
         return json({ error: `Cannot preview fix for ${issueType}` }, { status: 400 });
     }

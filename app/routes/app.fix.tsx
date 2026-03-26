@@ -129,6 +129,20 @@ export async function action({ request }: ActionFunctionArgs) {
         break;
       }
 
+      case "missing_category": {
+        const cat = await ai.suggestCategory(title, description, productType);
+        await admin.graphql(
+          `mutation($input: ProductInput!) {
+            productUpdate(input: $input) {
+              product { id }
+              userErrors { field message }
+            }
+          }`,
+          { variables: { input: { id: productGid, productCategory: { productTaxonomyNodeId: cat.categoryId } } } },
+        );
+        break;
+      }
+
       case "no_tags": {
         const tags = await ai.generateTags(title, description, productType, lang);
         await admin.graphql(

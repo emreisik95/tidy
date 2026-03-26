@@ -175,6 +175,26 @@ function PreviewContent({ data }: { data: any }) {
     );
   }
 
+  if (type === "category") {
+    return (
+      <BlockStack gap="200">
+        <Text as="h3" variant="headingSm">Suggested category</Text>
+        <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+          <BlockStack gap="100">
+            <Text as="p" variant="bodyMd" fontWeight="bold">{value.categoryName}</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Taxonomy ID: {value.categoryId}
+            </Text>
+          </BlockStack>
+        </Box>
+        <Text as="p" variant="bodySm" tone="subdued">
+          This sets your product's Google/Shopify category for tax calculations,
+          search filters, and Google Merchant Center compliance.
+        </Text>
+      </BlockStack>
+    );
+  }
+
   return null;
 }
 
@@ -232,8 +252,39 @@ export default function ProductDetail() {
     );
   }
 
-  const unfixedIssues = score?.issues.filter((i) => !i.fixedAt) || [];
-  const fixedIssues = score?.issues.filter((i) => i.fixedAt) || [];
+  const SEO_TYPES = new Set(["missing_seo_title", "missing_seo_description", "short_seo_description"]);
+
+  // Merge SEO issues into one row
+  const rawUnfixed = score?.issues.filter((i) => !i.fixedAt) || [];
+  const seoIssues = rawUnfixed.filter((i) => SEO_TYPES.has(i.type));
+  const nonSeoIssues = rawUnfixed.filter((i) => !SEO_TYPES.has(i.type));
+
+  const unfixedIssues = [
+    ...nonSeoIssues,
+    ...(seoIssues.length > 0
+      ? [{
+          id: seoIssues[0].id,
+          type: "missing_seo_title" as const, // triggers both title+desc fix
+          severity: "warning" as const,
+          field: "seo",
+          message: seoIssues.map((i) => i.message).join(". "),
+          aiFixable: true,
+          fixedAt: null,
+          _label: "Missing SEO Metadata",
+          _count: seoIssues.length,
+        }]
+      : []),
+  ];
+
+  const rawFixed = score?.issues.filter((i) => i.fixedAt) || [];
+  const fixedSeo = rawFixed.filter((i) => SEO_TYPES.has(i.type));
+  const fixedNonSeo = rawFixed.filter((i) => !SEO_TYPES.has(i.type));
+  const fixedIssues = [
+    ...fixedNonSeo,
+    ...(fixedSeo.length > 0
+      ? [{ ...fixedSeo[0], _label: "SEO Metadata" }]
+      : []),
+  ];
 
   return (
     <Page
@@ -375,7 +426,7 @@ export default function ProductDetail() {
                           </div>
                           <BlockStack gap="050">
                             <Text as="span" variant="bodyMd" fontWeight="semibold">
-                              {formatIssueType(issue.type)}
+                              {(issue as any)._label || formatIssueType(issue.type)}
                             </Text>
                             <Text as="span" variant="bodySm" tone="subdued">
                               {issue.message}
@@ -457,7 +508,7 @@ export default function ProductDetail() {
                     <InlineStack key={issue.id} gap="200" blockAlign="center">
                       <Badge tone="success">Fixed</Badge>
                       <Text as="span" variant="bodySm" tone="subdued">
-                        {formatIssueType(issue.type)}
+                        {(issue as any)._label || formatIssueType(issue.type)}
                       </Text>
                     </InlineStack>
                   ))}
