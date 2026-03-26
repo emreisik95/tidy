@@ -16,7 +16,7 @@ export function startFixWorker() {
       const { issueId, productGid, shopDomain, accessToken } = job.data;
 
       const { fixIssueWithToken } = await import(
-        "~/services/fixer.server"
+        "../services/fixer.server"
       );
       return fixIssueWithToken(shopDomain, accessToken, issueId, productGid);
     },
