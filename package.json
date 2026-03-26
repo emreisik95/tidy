@@ -35,6 +35,7 @@
     "@shopify/app-bridge-react": "^4.1.6",
     "@shopify/cli": "^3.92.1",
     "@shopify/polaris": "^12.0.0",
+    "@shopify/shopify-api": "^13.0.0",
     "@shopify/shopify-app-remix": "^4.1.0",
     "@shopify/shopify-app-session-storage-prisma": "^8.0.0",
     "bullmq": "^5.71.1",
