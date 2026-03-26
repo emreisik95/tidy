@@ -263,7 +263,7 @@ export default function Dashboard() {
             title={`${aiFixableCount} issues can be fixed with AI`}
             action={{
               content: "Fix all with AI",
-              url: "/app/products",
+              url: "/app/fix-all",
             }}
           >
             <p>

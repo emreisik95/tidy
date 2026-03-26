@@ -80,7 +80,7 @@ export function IssueBreakdown({ issues }: { issues: IssueSummary[] }) {
                 {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
               </Badge>
               {AI_FIXABLE_TYPES.has(issue.type) && (
-                <Button size="slim" url="/app/products">
+                <Button size="slim" url="/app/fix-all">
                   Fix
                 </Button>
               )}
