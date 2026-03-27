@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher, useRouteError } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -17,6 +17,7 @@ import {
 import { useState, useEffect, useCallback, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { AppError } from "../components/AppError";
 
 interface FixableIssue {
   issueId: string;
@@ -314,4 +315,8 @@ export default function FixAll() {
       </BlockStack>
     </Page>
   );
+}
+
+export function ErrorBoundary() {
+  return <AppError error={useRouteError()} />;
 }

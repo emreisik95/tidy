@@ -1,5 +1,5 @@
 import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Form, useSubmit } from "@remix-run/react";
+import { useLoaderData, Form, useSubmit, useRouteError } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -17,6 +17,7 @@ import { useState, useCallback } from "react";
 import { authenticate, PLANS } from "../shopify.server";
 import prisma from "../db.server";
 import { getActivePlan, type ActivePlan } from "../services/billing.server";
+import { AppError } from "../components/AppError";
 
 const LANGUAGES = [
   { label: "English", value: "en" },
@@ -249,4 +250,8 @@ export default function Settings() {
       </Layout>
     </Page>
   );
+}
+
+export function ErrorBoundary() {
+  return <AppError error={useRouteError()} />;
 }

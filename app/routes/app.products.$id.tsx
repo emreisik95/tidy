@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useFetcher, useRevalidator } from "@remix-run/react";
+import { useLoaderData, useFetcher, useRevalidator, useNavigation, useRouteError } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -14,9 +14,12 @@ import {
   Thumbnail,
   ProgressBar,
   Box,
+  SkeletonPage,
+  SkeletonBodyText,
 } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import { authenticate } from "../shopify.server";
+import { AppError } from "../components/AppError";
 import prisma from "../db.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -195,6 +198,7 @@ function PreviewContent({ data }: { data: any }) {
 }
 
 export default function ProductDetail() {
+  const navigation = useNavigation();
   const { productGid, product, score } = useLoaderData<typeof loader>();
   const previewFetcher = useFetcher<{ preview?: any; error?: string }>();
   const fixFetcher = useFetcher<{ success?: boolean; error?: string }>();
@@ -204,6 +208,17 @@ export default function ProductDetail() {
     issueType: string;
   } | null>(null);
   const [selectedCategoryGid, setSelectedCategoryGid] = useState<string | null>(null);
+
+  if (navigation.state === "loading") {
+    return (
+      <SkeletonPage primaryAction>
+        <BlockStack gap="400">
+          <Card><SkeletonBodyText lines={3} /></Card>
+          <Card><SkeletonBodyText lines={8} /></Card>
+        </BlockStack>
+      </SkeletonPage>
+    );
+  }
 
   const isGenerating = previewFetcher.state !== "idle";
   const isFixing = fixFetcher.state !== "idle";
@@ -573,4 +588,8 @@ export default function ProductDetail() {
       <div style={{ height: "1rem" }} />
     </Page>
   );
+}
+
+export function ErrorBoundary() {
+  return <AppError error={useRouteError()} />;
 }

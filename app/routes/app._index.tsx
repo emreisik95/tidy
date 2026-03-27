@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useFetcher, useNavigate } from "@remix-run/react";
+import { useLoaderData, useFetcher, useNavigate, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -12,6 +12,8 @@ import {
   Box,
   IndexTable,
   Thumbnail,
+  SkeletonPage,
+  SkeletonBodyText,
 } from "@shopify/polaris";
 import { ImageIcon } from "@shopify/polaris-icons";
 import { useEffect, useCallback, useState } from "react";
@@ -180,6 +182,7 @@ function StatusDot({ ok }: { ok: boolean | null }) {
 }
 
 export default function Dashboard() {
+  const navigation = useNavigation();
   const { productCount, previewProducts, scan, issueList, totalIssues, aiFixableCount, shopStats, scanTrend } =
     useLoaderData<typeof loader>();
   const scanFetcher = useFetcher<{ scanId: string }>();
@@ -187,6 +190,17 @@ export default function Dashboard() {
   const revalidator = useRevalidator();
   const navigate = useNavigate();
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
+
+  if (navigation.state === "loading") {
+    return (
+      <SkeletonPage primaryAction>
+        <BlockStack gap="400">
+          <Card><SkeletonBodyText lines={3} /></Card>
+          <Card><SkeletonBodyText lines={8} /></Card>
+        </BlockStack>
+      </SkeletonPage>
+    );
+  }
 
   const isScanning = activeScanId !== null || scan?.status === "running" || scan?.status === "pending";
   const hasScanResults = scan?.status === "completed";
