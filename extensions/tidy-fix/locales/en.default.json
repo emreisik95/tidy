@@ -1,0 +1,14 @@
+{
+  "name": "Fix with Tidy",
+  "checking": "Checking product data...",
+  "allGood": "This product looks good. No missing fields found.",
+  "issuesFound": "{{count}} issues found",
+  "missingAltText": "Missing image alt text",
+  "missingSeoTitle": "Missing SEO title",
+  "missingSeoDescription": "Missing SEO description",
+  "missingDescription": "Missing or short description",
+  "missingCategory": "Missing product category",
+  "missingTags": "No tags",
+  "openTidy": "Fix in Tidy",
+  "close": "Close"
+}
