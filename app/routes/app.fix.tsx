@@ -108,8 +108,8 @@ export async function action({ request }: ActionFunctionArgs) {
             data: { fixedAt: new Date() },
           });
         }
-        // Recalculate score and return
-        await recalculateScore(productGid);
+        // Rescan product and return
+        await rescanProduct(admin, productGid);
         return json({ success: true, issueId, issueType });
       }
 
