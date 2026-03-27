@@ -121,17 +121,6 @@ const rules: Rule[] = [
     check: (p) => (p.tags.length === 0 ? "Product has no tags" : null),
   },
   {
-    type: "missing_barcode",
-    field: "variants.barcode",
-    weight: 5,
-    severity: "info",
-    aiFixable: false,
-    check: (p) => {
-      const hasBarcode = p.variants.some((v) => v.barcode?.trim());
-      return hasBarcode ? null : "No variant has a barcode/GTIN";
-    },
-  },
-  {
     type: "missing_vendor",
     field: "vendor",
     weight: 3,

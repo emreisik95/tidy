@@ -53,8 +53,9 @@ describe("scoreProduct", () => {
 
   it("scores a completely empty product very low", () => {
     const result = scoreProduct(emptyProduct);
-    // Earns 15 from missing_alt_text (no images = no alt text needed)
-    expect(result.score).toBe(15);
+    // Earns 16% from missing_alt_text (no images = no alt text needed)
+    // Max weight = 95 (barcode removed), earned = 15 (alt text), score = round(15/95*100) = 16
+    expect(result.score).toBe(16);
     expect(result.issues.length).toBeGreaterThan(5);
   });
 
@@ -128,7 +129,7 @@ describe("scoreProduct", () => {
     expect(altIssue).toBeUndefined();
   });
 
-  it("flags missing barcode as info", () => {
+  it("does not check for missing barcode", () => {
     const product = {
       ...perfectProduct,
       variants: [{ id: "v1", barcode: null }],
@@ -137,9 +138,7 @@ describe("scoreProduct", () => {
     const barcodeIssue = result.issues.find(
       (i) => i.type === "missing_barcode",
     );
-    expect(barcodeIssue).toBeDefined();
-    expect(barcodeIssue!.severity).toBe("info");
-    expect(barcodeIssue!.aiFixable).toBe(false);
+    expect(barcodeIssue).toBeUndefined();
   });
 
   it("returns maxScore of 100", () => {
@@ -147,15 +146,13 @@ describe("scoreProduct", () => {
     expect(result.maxScore).toBe(100);
   });
 
-  it("handles product with all fields but no barcodes", () => {
+  it("gives full score even without barcodes (barcode not checked)", () => {
     const product = {
       ...perfectProduct,
       variants: [{ id: "v1", barcode: null }],
     };
     const result = scoreProduct(product);
-    expect(result.score).toBeLessThan(100);
-    const barcodeIssue = result.issues.find((i) => i.type === "missing_barcode");
-    expect(barcodeIssue).toBeDefined();
+    expect(result.score).toBe(100);
   });
 
   it("gives full score when all fields present", () => {
@@ -171,8 +168,7 @@ describe("scoreProduct", () => {
     const nonFixable = result.issues.filter((i) => !i.aiFixable);
     expect(fixable.length).toBeGreaterThan(0);
     expect(nonFixable.length).toBeGreaterThan(0);
-    // Barcode and vendor should NOT be AI fixable
-    expect(nonFixable.some((i) => i.type === "missing_barcode")).toBe(true);
+    // Vendor should NOT be AI fixable
     expect(nonFixable.some((i) => i.type === "missing_vendor")).toBe(true);
   });
 });
