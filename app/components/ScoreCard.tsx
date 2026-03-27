@@ -3,7 +3,10 @@ import {
   Text,
   ProgressBar,
   InlineStack,
+  InlineGrid,
   BlockStack,
+  Box,
+  Divider,
 } from "@shopify/polaris";
 
 interface ScoreCardProps {
@@ -26,25 +29,41 @@ function getScoreLabel(score: number): string {
   return "Critical";
 }
 
+function Metric({ value, label }: { value: string | number; label: string }) {
+  return (
+    <BlockStack gap="100">
+      <Text as="p" variant="headingLg" fontWeight="bold">
+        {value}
+      </Text>
+      <Text as="p" variant="bodySm" tone="subdued">
+        {label}
+      </Text>
+    </BlockStack>
+  );
+}
+
 export function ScoreCard({ score, totalProducts, issueCount }: ScoreCardProps) {
   const tone = getScoreColor(score);
 
   return (
-    <Card>
+    <Card roundedAbove="sm">
       <BlockStack gap="400">
-        <InlineStack align="space-between">
-          <Text as="h2" variant="headingLg">
-            Store Health
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="h2" variant="headingSm">
+            Store health
           </Text>
-          <Text as="p" variant="headingXl" tone={tone}>
-            {score}/100
+          <Text as="span" variant="bodySm" tone="subdued">
+            {getScoreLabel(score)}
           </Text>
         </InlineStack>
+
         <ProgressBar progress={score} tone={tone} size="small" />
-        <Text as="p" variant="bodyMd" tone="subdued">
-          {getScoreLabel(score)} &mdash; {totalProducts} products scanned,{" "}
-          {issueCount} issues found
-        </Text>
+
+        <InlineGrid columns={3} gap="400">
+          <Metric value={`${score}/100`} label="Health score" />
+          <Metric value={totalProducts} label="Products scanned" />
+          <Metric value={issueCount} label="Issues found" />
+        </InlineGrid>
       </BlockStack>
     </Card>
   );

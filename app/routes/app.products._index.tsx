@@ -125,7 +125,7 @@ export default function ProductList() {
     >
       <Layout>
         <Layout.Section>
-          <Card padding="0">
+          <Card roundedAbove="sm" padding="0">
             <IndexTable
               itemCount={products.length}
               headings={[

@@ -2,18 +2,17 @@ import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher, useRevalidator } from "@remix-run/react";
 import {
   Page,
-  Layout,
   Card,
   Text,
   BlockStack,
   InlineStack,
+  InlineGrid,
   Badge,
   Button,
   Banner,
   Divider,
   Thumbnail,
   ProgressBar,
-  Modal,
   Box,
 } from "@shopify/polaris";
 import { useState, useCallback } from "react";
@@ -232,7 +231,7 @@ export default function ProductDetail() {
   if (!product) {
     return (
       <Page title="Product not found" backAction={{ url: "/app/products" }}>
-        <Card>
+        <Card roundedAbove="sm">
           <Text as="p">This product could not be found.</Text>
         </Card>
       </Page>
@@ -279,11 +278,11 @@ export default function ProductDetail() {
       subtitle={product.productType || undefined}
       backAction={{ url: "/app/products" }}
     >
-      <Layout>
+      <InlineGrid columns={{ xs: 1, md: "1fr 2fr" }} gap="400">
         {/* Left: Product info */}
-        <Layout.Section variant="oneThird">
+        <BlockStack gap="400">
           <BlockStack gap="400">
-            <Card>
+            <Card roundedAbove="sm">
               <BlockStack gap="300">
                 {product.featuredImage && (
                   <Thumbnail
@@ -317,7 +316,7 @@ export default function ProductDetail() {
             </Card>
 
             {/* SEO Preview */}
-            <Card>
+            <Card roundedAbove="sm">
               <BlockStack gap="200">
                 <Text as="h3" variant="headingSm">SEO preview</Text>
                 <Divider />
@@ -339,14 +338,14 @@ export default function ProductDetail() {
               </BlockStack>
             </Card>
           </BlockStack>
-        </Layout.Section>
+        </BlockStack>
 
         {/* Right: Score + Issues */}
-        <Layout.Section>
+        <BlockStack gap="400">
           <BlockStack gap="400">
             {/* Score */}
             {score && (
-              <Card>
+              <Card roundedAbove="sm">
                 <BlockStack gap="300">
                   <InlineStack align="space-between">
                     <Text as="h2" variant="headingMd">Health score</Text>
@@ -388,7 +387,7 @@ export default function ProductDetail() {
 
             {/* Issues */}
             {unfixedIssues.length > 0 && (
-              <Card>
+              <Card roundedAbove="sm">
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
                     Issues ({unfixedIssues.length})
@@ -532,7 +531,7 @@ export default function ProductDetail() {
 
             {/* Fixed issues */}
             {fixedIssues.length > 0 && (
-              <Card>
+              <Card roundedAbove="sm">
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingSm" tone="subdued">
                     Fixed ({fixedIssues.length})
@@ -556,8 +555,8 @@ export default function ProductDetail() {
               </Banner>
             )}
           </BlockStack>
-        </Layout.Section>
-      </Layout>
+        </BlockStack>
+      </InlineGrid>
     </Page>
   );
 }
