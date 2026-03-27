@@ -103,11 +103,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  return json({ issues, typeCounts });
+  // Check for recent completed/running batch
+  const latestBatch = await prisma.fixBatch.findFirst({
+    where: { shopDomain: session.shop },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return json({
+    issues,
+    typeCounts,
+    latestBatch: latestBatch
+      ? {
+          id: latestBatch.id,
+          status: latestBatch.status,
+          totalIssues: latestBatch.totalIssues,
+          completedIssues: latestBatch.completedIssues,
+          failedIssues: latestBatch.failedIssues,
+          createdAt: latestBatch.createdAt,
+        }
+      : null,
+  });
 }
 
 export default function FixAll() {
-  const { issues, typeCounts } = useLoaderData<typeof loader>();
+  const { issues, typeCounts, latestBatch } = useLoaderData<typeof loader>();
 
   // Selected issue types (all enabled by default)
   const availableTypes = Object.keys(typeCounts);
@@ -122,10 +141,17 @@ export default function FixAll() {
   const cancelFetcher = useFetcher<{ success?: boolean }>();
   const undoFetcher = useFetcher<{ success?: boolean; undoneCount?: number }>();
 
-  const [batchId, setBatchId] = useState<string | null>(null);
+  // Resume polling if there's an active batch from a previous visit
+  const [batchId, setBatchId] = useState<string | null>(
+    latestBatch && (latestBatch.status === "running" || latestBatch.status === "pending")
+      ? latestBatch.id
+      : null,
+  );
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const batch = statusFetcher.data?.batch;
+  // Use polled batch data, or fall back to loader's latestBatch for completed batches
+  const batch = statusFetcher.data?.batch
+    || (batchId ? null : latestBatch);
   const isStarting = createFetcher.state !== "idle";
   const isCancelling = cancelFetcher.state !== "idle";
   const isUndoing = undoFetcher.state !== "idle";
@@ -226,6 +252,44 @@ export default function FixAll() {
   return (
     <Page title="Fix all with AI" backAction={{ url: "/app" }}>
       <BlockStack gap="500">
+        {/* Previous batch results */}
+        {!batchId && !isStarting && latestBatch && (latestBatch.status === "completed" || latestBatch.status === "cancelled") && (
+          <Card roundedAbove="sm">
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingSm">
+                  Last batch: {latestBatch.completedIssues} fixed
+                  {latestBatch.failedIssues > 0 ? `, ${latestBatch.failedIssues} failed` : ""}
+                  {latestBatch.status === "cancelled" ? " (cancelled)" : ""}
+                </Text>
+                <InlineStack gap="200">
+                  <Button
+                    tone="critical"
+                    size="slim"
+                    onClick={() => {
+                      undoFetcher.submit(
+                        { batchId: latestBatch.id },
+                        { method: "POST", action: "/app/undo" },
+                      );
+                    }}
+                    loading={isUndoing}
+                  >
+                    Undo all
+                  </Button>
+                  <Button size="slim" url="/app">
+                    Dashboard
+                  </Button>
+                </InlineStack>
+              </InlineStack>
+              {undoFetcher.data?.success && (
+                <Banner tone="success">
+                  <p>All fixes from the last batch have been undone.</p>
+                </Banner>
+              )}
+            </BlockStack>
+          </Card>
+        )}
+
         {/* Type selection */}
         {!batchId && !isStarting && (
           <Card roundedAbove="sm">
