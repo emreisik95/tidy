@@ -137,10 +137,43 @@ export async function action({ request }: ActionFunctionArgs) {
       }
 
       case "missing_category": {
-        const categoryGid = formData.get("categoryGid") as string;
+        let categoryGid = formData.get("categoryGid") as string;
+
+        // If no category provided (e.g. from Fix All), auto-select best match
         if (!categoryGid) {
-          return json({ error: "No category selected" }, { status: 400 });
+          const suggestedName = await ai.suggestCategoryName(title, description, productType);
+          const segments = suggestedName.split(">").map((s: string) => s.trim());
+          const searchQueries = [
+            segments.slice(-2).join(" "),
+            segments.slice(-1).join(" "),
+            productType || title,
+          ].filter(Boolean);
+
+          let bestMatch: { id: string; isLeaf: boolean } | null = null;
+
+          for (const query of searchQueries) {
+            const taxResponse = await admin.graphql(
+              `query TaxSearch($query: String!) {
+                taxonomy { categories(first: 5, search: $query) { nodes { id isLeaf } } }
+              }`,
+              { variables: { query } },
+            );
+            const taxData = await taxResponse.json();
+            const nodes = taxData.data?.taxonomy?.categories?.nodes || [];
+
+            // Prefer leaf categories (most specific)
+            const leaf = nodes.find((n: any) => n.isLeaf);
+            if (leaf) { bestMatch = leaf; break; }
+            if (!bestMatch && nodes.length > 0) bestMatch = nodes[0];
+          }
+
+          if (!bestMatch) {
+            // Can't find a category -- skip silently
+            break;
+          }
+          categoryGid = bestMatch.id;
         }
+
         await admin.graphql(
           `mutation($input: ProductInput!) {
             productUpdate(input: $input) {
