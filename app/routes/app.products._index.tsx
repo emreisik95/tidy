@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useNavigate, useSearchParams, useNavigation, useRouteError } from "@remix-run/react";
+import { useLoaderData, useNavigate, useSearchParams, useRouteError } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -13,8 +13,6 @@ import {
   ProgressBar,
   Divider,
   Button,
-  SkeletonPage,
-  SkeletonBodyText,
 } from "@shopify/polaris";
 import { ImageIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -125,21 +123,9 @@ function scoreTone(score: number): "success" | "warning" | "critical" {
 }
 
 export default function ProductList() {
-  const navigation = useNavigation();
   const { products, total, page, pageSize } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
-
-  if (navigation.state === "loading") {
-    return (
-      <SkeletonPage primaryAction>
-        <BlockStack gap="400">
-          <Card><SkeletonBodyText lines={3} /></Card>
-          <Card><SkeletonBodyText lines={8} /></Card>
-        </BlockStack>
-      </SkeletonPage>
-    );
-  }
   const totalPages = Math.ceil(total / pageSize);
   const hasPrev = page > 1;
   const hasNext = page < totalPages;
