@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
+import { useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -26,7 +26,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 
   if (!shop) {
-    return json({ products: [] });
+    return json({ products: [], total: 0, page: 1, pageSize: 10 });
   }
 
   const latestScan = await prisma.scan.findFirst({
@@ -35,14 +35,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 
   if (!latestScan) {
-    return json({ products: [] });
+    return json({ products: [], total: 0, page: 1, pageSize: 10 });
   }
 
-  const productScores = await prisma.productScore.findMany({
-    where: { scanId: latestScan.id },
-    include: { issues: true },
-    orderBy: { score: "asc" },
-  });
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
+  const pageSize = 10;
+
+  const [productScores, total] = await Promise.all([
+    prisma.productScore.findMany({
+      where: { scanId: latestScan.id },
+      include: { issues: true },
+      orderBy: { score: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.productScore.count({ where: { scanId: latestScan.id } }),
+  ]);
 
   // Fetch images
   const gids = productScores.map((p) => p.productGid);
@@ -100,6 +109,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
         issues: issueLabels,
       };
     }),
+    total,
+    page,
+    pageSize,
   });
 }
 
@@ -110,8 +122,12 @@ function scoreTone(score: number): "success" | "warning" | "critical" {
 }
 
 export default function ProductList() {
-  const { products } = useLoaderData<typeof loader>();
+  const { products, total, page, pageSize } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
+  const totalPages = Math.ceil(total / pageSize);
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
 
   if (products.length === 0) {
     return (
@@ -216,6 +232,36 @@ export default function ProductList() {
             </BlockStack>
           </Card>
         ))}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Card roundedAbove="sm">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="span" variant="bodySm" tone="subdued">
+                Page {page} of {totalPages} ({total} products)
+              </Text>
+              <InlineStack gap="200">
+                <Button
+                  size="slim"
+                  disabled={!hasPrev}
+                  onClick={() => setSearchParams({ page: String(page - 1) })}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="slim"
+                  disabled={!hasNext}
+                  onClick={() => setSearchParams({ page: String(page + 1) })}
+                >
+                  Next
+                </Button>
+              </InlineStack>
+            </InlineStack>
+          </Card>
+        )}
+
+        {/* Bottom spacing */}
+        <div style={{ height: "1rem" }} />
       </BlockStack>
     </Page>
   );
