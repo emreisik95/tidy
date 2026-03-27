@@ -114,9 +114,14 @@ export async function fixIssueWithToken(
   issueId: string,
   productGid: string,
 ) {
-  const issue = await prisma.issue.findUniqueOrThrow({
+  const issue = await prisma.issue.findUnique({
     where: { id: issueId },
   });
+
+  if (!issue) {
+    console.warn(`Issue ${issueId} not found (deleted by re-scan), skipping`);
+    return { success: false, skipped: true };
+  }
 
   if (issue.fixedAt) {
     return { success: true, alreadyFixed: true };
