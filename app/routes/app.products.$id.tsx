@@ -30,6 +30,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     where: { domain: session.shop },
   });
 
+  const fixHistory = await prisma.fixHistory.findMany({
+    where: { productGid, shopDomain: session.shop, rolledBack: false },
+    orderBy: { appliedAt: "desc" },
+    take: 10,
+  });
+
   const latestScan = shop
     ? await prisma.scan.findFirst({
         where: { shopId: shop.id, status: "completed" },
@@ -112,6 +118,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       : null,
     plan: shop?.plan || "free",
     canUseAI: (shop?.plan === "ai") || process.env.NODE_ENV !== "production",
+    fixHistory: fixHistory.map(h => ({ id: h.id, field: h.field, fixType: h.fixType, appliedAt: h.appliedAt })),
   });
 }
 
@@ -201,9 +208,10 @@ function PreviewContent({ data }: { data: any }) {
 
 export default function ProductDetail() {
   const navigation = useNavigation();
-  const { productGid, product, score, canUseAI } = useLoaderData<typeof loader>();
+  const { productGid, product, score, canUseAI, fixHistory } = useLoaderData<typeof loader>();
   const previewFetcher = useFetcher<{ preview?: any; error?: string }>();
   const fixFetcher = useFetcher<{ success?: boolean; error?: string }>();
+  const undoFetcher = useFetcher();
   const revalidator = useRevalidator();
   const [activePreview, setActivePreview] = useState<{
     issueId: string;
@@ -577,6 +585,35 @@ export default function ProductDetail() {
                       <Text as="span" variant="bodySm" tone="subdued">
                         {(issue as any)._label || formatIssueType(issue.type)}
                       </Text>
+                    </InlineStack>
+                  ))}
+                </BlockStack>
+              </Card>
+            )}
+
+            {/* Undo history */}
+            {fixHistory.length > 0 && (
+              <Card roundedAbove="sm">
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingSm">Recent fixes</Text>
+                  <Divider />
+                  {fixHistory.map((h) => (
+                    <InlineStack key={h.id} align="space-between" blockAlign="center">
+                      <Text as="span" variant="bodySm">
+                        {h.field.startsWith("alt_text") ? "Alt text" : h.field === "seo" ? "SEO" : h.field} fix
+                      </Text>
+                      <Button
+                        size="slim"
+                        tone="critical"
+                        onClick={() => {
+                          undoFetcher.submit(
+                            { historyId: h.id },
+                            { method: "POST", action: "/app/undo" },
+                          );
+                        }}
+                      >
+                        Undo
+                      </Button>
                     </InlineStack>
                   ))}
                 </BlockStack>

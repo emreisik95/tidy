@@ -71,6 +71,16 @@ export async function action({ request }: ActionFunctionArgs) {
       case "missing_description":
       case "short_description": {
         const generated = await ai.generateDescription(title, productType, description, lang);
+        await prisma.fixHistory.create({
+          data: {
+            shopDomain: session.shop,
+            productGid,
+            field: "description",
+            oldValue: description,
+            newValue: generated,
+            fixType: issueType,
+          },
+        });
         await admin.graphql(
           `mutation($input: ProductInput!) {
             productUpdate(input: $input) {
@@ -87,6 +97,16 @@ export async function action({ request }: ActionFunctionArgs) {
       case "missing_seo_description":
       case "short_seo_description": {
         const generated = await ai.generateSeo(title, description, productType, lang);
+        await prisma.fixHistory.create({
+          data: {
+            shopDomain: session.shop,
+            productGid,
+            field: "seo",
+            oldValue: JSON.stringify({ title: product.seo?.title, description: product.seo?.description }),
+            newValue: JSON.stringify(generated),
+            fixType: issueType,
+          },
+        });
         await admin.graphql(
           `mutation($input: ProductInput!) {
             productUpdate(input: $input) {
@@ -144,6 +164,19 @@ export async function action({ request }: ActionFunctionArgs) {
           );
         }
         if (mediaUpdates.length > 0) {
+          for (const update of mediaUpdates) {
+            const originalAlt = images.find((e: any) => e.node.id === update.id)?.node?.alt || "";
+            await prisma.fixHistory.create({
+              data: {
+                shopDomain: session.shop,
+                productGid,
+                field: `alt_text:${update.id}`,
+                oldValue: originalAlt,
+                newValue: update.alt,
+                fixType: "missing_alt_text",
+              },
+            });
+          }
           await admin.graphql(
             `mutation($productId: ID!, $media: [UpdateMediaInput!]!) {
               productUpdateMedia(productId: $productId, media: $media) {
@@ -209,6 +242,16 @@ export async function action({ request }: ActionFunctionArgs) {
 
       case "no_tags": {
         const tags = await ai.generateTags(title, description, productType, lang);
+        await prisma.fixHistory.create({
+          data: {
+            shopDomain: session.shop,
+            productGid,
+            field: "tags",
+            oldValue: JSON.stringify(product.tags),
+            newValue: JSON.stringify(tags),
+            fixType: "no_tags",
+          },
+        });
         await admin.graphql(
           `mutation($input: ProductInput!) {
             productUpdate(input: $input) {

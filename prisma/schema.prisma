@@ -135,3 +135,17 @@ model Issue {
 
   @@index([productScoreId])
 }
+
+model FixHistory {
+  id          String   @id @default(cuid())
+  shopDomain  String
+  productGid  String
+  field       String
+  oldValue    String?
+  newValue    String?
+  fixType     String
+  appliedAt   DateTime @default(now())
+  rolledBack  Boolean  @default(false)
+
+  @@index([shopDomain, productGid])
+}
