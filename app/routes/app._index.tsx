@@ -191,7 +191,49 @@ export default function Dashboard() {
   const revalidator = useRevalidator();
   const navigate = useNavigate();
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(true);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const dismissed = localStorage.getItem("tidy-onboarding-dismissed");
+      if (dismissed === "true") setShowGuide(false);
+    }
+  }, []);
+
+  const dismissGuide = useCallback(() => {
+    setShowGuide(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tidy-onboarding-dismissed", "true");
+    }
+  }, []);
+
+  const handleScan = useCallback(() => {
+    scanFetcher.submit(null, { method: "POST", action: "/app/scan" });
+  }, [scanFetcher]);
+
+  useEffect(() => {
+    if (scanFetcher.data?.scanId) {
+      setActiveScanId(scanFetcher.data.scanId);
+    }
+  }, [scanFetcher.data]);
+
+  useEffect(() => {
+    if (!activeScanId) return;
+    const interval = setInterval(() => {
+      statusFetcher.load(`/app/scan?scanId=${activeScanId}`);
+    }, SCAN_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [activeScanId]);
+
+  useEffect(() => {
+    const scanData = statusFetcher.data?.scan;
+    if (scanData?.status === "completed" || scanData?.status === "failed") {
+      setActiveScanId(null);
+      revalidator.revalidate();
+    }
+  }, [statusFetcher.data]);
+
+  // Skeleton loading -- AFTER all hooks
   if (navigation.state === "loading") {
     return (
       <SkeletonPage primaryAction>
@@ -205,51 +247,6 @@ export default function Dashboard() {
 
   const isScanning = activeScanId !== null || scan?.status === "running" || scan?.status === "pending";
   const hasScanResults = scan?.status === "completed";
-
-  const [showGuide, setShowGuide] = useState(true);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const dismissed = localStorage.getItem("tidy-onboarding-dismissed");
-      if (dismissed === "true") setShowGuide(false);
-    }
-  }, []);
-
-  const dismissGuide = () => {
-    setShowGuide(false);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("tidy-onboarding-dismissed", "true");
-    }
-  };
-
-  const handleScan = useCallback(() => {
-    scanFetcher.submit(null, { method: "POST", action: "/app/scan" });
-  }, [scanFetcher]);
-
-  // When scan starts, grab the scan ID and start polling
-  useEffect(() => {
-    if (scanFetcher.data?.scanId) {
-      setActiveScanId(scanFetcher.data.scanId);
-    }
-  }, [scanFetcher.data]);
-
-  // Poll scan status every 3s while scanning
-  useEffect(() => {
-    if (!activeScanId) return;
-    const interval = setInterval(() => {
-      statusFetcher.load(`/app/scan?scanId=${activeScanId}`);
-    }, SCAN_POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [activeScanId]);
-
-  // When scan completes, revalidate the page data (no full reload)
-  useEffect(() => {
-    const scanData = statusFetcher.data?.scan;
-    if (scanData?.status === "completed" || scanData?.status === "failed") {
-      setActiveScanId(null);
-      revalidator.revalidate();
-    }
-  }, [statusFetcher.data]);
 
   return (
     <Page
