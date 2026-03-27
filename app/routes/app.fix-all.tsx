@@ -9,7 +9,6 @@ import {
   Badge,
   Banner,
   ProgressBar,
-  Spinner,
   Divider,
   Checkbox,
   Button,
@@ -18,6 +17,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { AppError } from "../components/AppError";
+import { SCAN_POLL_INTERVAL_MS } from "../lib/constants";
 
 interface FixableIssue {
   issueId: string;
@@ -106,11 +106,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return json({ issues, typeCounts });
 }
 
-type FixStatus = "pending" | "fixing" | "done" | "failed" | "skipped";
-
 export default function FixAll() {
   const { issues, typeCounts } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<{ success?: boolean; error?: string }>();
 
   // Selected issue types (all enabled by default)
   const availableTypes = Object.keys(typeCounts);
@@ -120,18 +117,59 @@ export default function FixAll() {
 
   const filteredIssues = issues.filter((i) => selectedTypes.has(i.issueType));
 
-  const [statuses, setStatuses] = useState<Record<string, FixStatus>>({});
-  const [currentIndex, setCurrentIndex] = useState(-1);
-  const [isRunning, setIsRunning] = useState(false);
-  const indexRef = useRef(-1);
-  const filteredRef = useRef<FixableIssue[]>([]);
+  const createFetcher = useFetcher<{ batchId?: string; error?: string }>();
+  const statusFetcher = useFetcher<{ batch?: { id: string; status: string; totalIssues: number; completedIssues: number; failedIssues: number }; error?: string }>();
+  const cancelFetcher = useFetcher<{ success?: boolean }>();
+  const undoFetcher = useFetcher<{ success?: boolean; undoneCount?: number }>();
 
-  const doneCount = Object.values(statuses).filter((s) => s === "done").length;
-  const failedCount = Object.values(statuses).filter((s) => s === "failed").length;
-  // Use ref length when running (stable), filtered length when not yet started
-  const totalToFix = filteredRef.current.length > 0 ? filteredRef.current.length : filteredIssues.length;
-  const progress = totalToFix > 0 ? Math.round(((doneCount + failedCount) / totalToFix) * 100) : 0;
-  const allDone = (doneCount + failedCount) === totalToFix && totalToFix > 0 && isRunning === false;
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const batch = statusFetcher.data?.batch;
+  const isStarting = createFetcher.state !== "idle";
+  const isCancelling = cancelFetcher.state !== "idle";
+  const isUndoing = undoFetcher.state !== "idle";
+
+  const isRunning = batch?.status === "running" || batch?.status === "pending";
+  const isCompleted = batch?.status === "completed";
+  const isCancelled = batch?.status === "cancelled";
+  const allDone = isCompleted || isCancelled;
+
+  const totalIssues = batch?.totalIssues || 0;
+  const completedIssues = batch?.completedIssues || 0;
+  const failedIssues = batch?.failedIssues || 0;
+  const progress = totalIssues > 0 ? Math.round(((completedIssues + failedIssues) / totalIssues) * 100) : 0;
+
+  // When batch is created, store ID and start polling
+  useEffect(() => {
+    if (createFetcher.data?.batchId && !batchId) {
+      setBatchId(createFetcher.data.batchId);
+    }
+  }, [createFetcher.data]);
+
+  // Poll batch status
+  useEffect(() => {
+    if (!batchId) return;
+
+    // Initial fetch
+    statusFetcher.load(`/app/fix-batch?id=${batchId}`);
+
+    pollRef.current = setInterval(() => {
+      statusFetcher.load(`/app/fix-batch?id=${batchId}`);
+    }, SCAN_POLL_INTERVAL_MS);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [batchId]);
+
+  // Stop polling when batch is done
+  useEffect(() => {
+    if (allDone && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, [allDone]);
 
   const toggleType = useCallback((type: string) => {
     setSelectedTypes((prev) => {
@@ -144,53 +182,36 @@ export default function FixAll() {
 
   const startFixing = useCallback(() => {
     if (filteredIssues.length === 0) return;
-    filteredRef.current = filteredIssues;
-    setIsRunning(true);
-    const initial: Record<string, FixStatus> = {};
-    filteredIssues.forEach((i) => { initial[i.issueId] = "pending"; });
-    setStatuses(initial);
-    setCurrentIndex(0);
-    indexRef.current = 0;
-  }, [filteredIssues]);
-
-  useEffect(() => {
-    if (!isRunning || currentIndex < 0 || currentIndex >= filteredRef.current.length) return;
-    if (fetcher.state !== "idle") return;
-
-    const issue = filteredRef.current[currentIndex];
-    setStatuses((prev) => ({ ...prev, [issue.issueId]: "fixing" }));
-
-    fetcher.submit(
+    createFetcher.submit(
       {
-        issueId: issue.issueId,
-        productGid: issue.productGid,
-        issueType: issue.issueType,
+        action: "create",
+        issues: JSON.stringify(
+          filteredIssues.map((i) => ({
+            issueId: i.issueId,
+            productGid: i.productGid,
+            issueType: i.issueType,
+          })),
+        ),
       },
-      { method: "POST", action: "/app/fix" },
+      { method: "POST", action: "/app/fix-batch" },
     );
-  }, [currentIndex, isRunning, fetcher.state]);
+  }, [filteredIssues, createFetcher]);
 
-  useEffect(() => {
-    if (!isRunning || fetcher.state !== "idle" || !fetcher.data) return;
-    if (indexRef.current < 0 || indexRef.current >= filteredRef.current.length) return;
+  const handleCancel = useCallback(() => {
+    if (!batchId) return;
+    cancelFetcher.submit(
+      { action: "cancel", batchId },
+      { method: "POST", action: "/app/fix-batch" },
+    );
+  }, [batchId, cancelFetcher]);
 
-    const issue = filteredRef.current[indexRef.current];
-    const success = fetcher.data.success;
-
-    setStatuses((prev) => ({
-      ...prev,
-      [issue.issueId]: success ? "done" : "failed",
-    }));
-
-    const nextIndex = indexRef.current + 1;
-    indexRef.current = nextIndex;
-
-    if (nextIndex < filteredRef.current.length) {
-      setCurrentIndex(nextIndex);
-    } else {
-      setIsRunning(false);
-    }
-  }, [fetcher.data, fetcher.state]);
+  const handleUndo = useCallback(() => {
+    if (!batchId) return;
+    undoFetcher.submit(
+      { batchId },
+      { method: "POST", action: "/app/undo" },
+    );
+  }, [batchId, undoFetcher]);
 
   if (issues.length === 0) {
     return (
@@ -206,7 +227,7 @@ export default function FixAll() {
     <Page title="Fix all with AI" backAction={{ url: "/app" }}>
       <BlockStack gap="500">
         {/* Type selection */}
-        {!isRunning && !allDone && (
+        {!batchId && !isStarting && (
           <Card roundedAbove="sm">
             <BlockStack gap="400">
               <Text as="h2" variant="headingSm">
@@ -244,71 +265,84 @@ export default function FixAll() {
           </Card>
         )}
 
+        {/* Starting banner */}
+        {isStarting && !batchId && (
+          <Card roundedAbove="sm">
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingSm">Starting batch fix...</Text>
+            </BlockStack>
+          </Card>
+        )}
+
         {/* Progress */}
-        {(isRunning || allDone) && (
+        {batchId && (
           <Card roundedAbove="sm">
             <BlockStack gap="300">
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h2" variant="headingSm">
                   {allDone
-                    ? `Done -- ${doneCount} fixed${failedCount > 0 ? `, ${failedCount} failed` : ""}`
-                    : `Fixing... ${doneCount} of ${totalToFix}`}
+                    ? `Done -- ${completedIssues} fixed${failedIssues > 0 ? `, ${failedIssues} failed` : ""}`
+                    : `Fixing... ${completedIssues} of ${totalIssues}`}
                 </Text>
-                {allDone && (
-                  <Button url="/app" variant="primary">
-                    Back to dashboard
-                  </Button>
-                )}
+                <InlineStack gap="200">
+                  {isRunning && (
+                    <Button
+                      tone="critical"
+                      onClick={handleCancel}
+                      loading={isCancelling}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  {allDone && (
+                    <Button url="/app" variant="primary">
+                      Back to dashboard
+                    </Button>
+                  )}
+                </InlineStack>
               </InlineStack>
               <ProgressBar
                 progress={progress}
-                tone={allDone && failedCount === 0 ? "success" : "primary"}
+                tone={allDone && failedIssues === 0 ? "success" : "primary"}
                 size="small"
               />
             </BlockStack>
           </Card>
         )}
 
-        {/* Issue list */}
-        {(isRunning || allDone) && (
+        {/* Background banner */}
+        {isRunning && (
+          <Banner tone="info">
+            <p>You can leave this page. Fixes continue in the background.</p>
+          </Banner>
+        )}
+
+        {/* Undo all */}
+        {allDone && completedIssues > 0 && (
           <Card roundedAbove="sm">
-            <BlockStack gap="200">
-              {filteredRef.current.map((issue) => {
-                const status = statuses[issue.issueId] || "pending";
-                return (
-                  <div key={issue.issueId}>
-                    <InlineStack align="space-between" blockAlign="center" gap="200">
-                      <BlockStack gap="050">
-                        <Text as="span" variant="bodySm" fontWeight="semibold">
-                          {issue.productTitle}
-                        </Text>
-                        <Text as="span" variant="bodySm" tone="subdued">
-                          {issue.issueLabel}
-                        </Text>
-                      </BlockStack>
-                      <div style={{ minWidth: 70, textAlign: "right" }}>
-                        {status === "pending" && (
-                          <Text as="span" variant="bodySm" tone="subdued">Waiting</Text>
-                        )}
-                        {status === "fixing" && (
-                          <InlineStack gap="100" blockAlign="center">
-                            <Spinner size="small" />
-                          </InlineStack>
-                        )}
-                        {status === "done" && (
-                          <Badge tone="success" size="small">Done</Badge>
-                        )}
-                        {status === "failed" && (
-                          <Badge tone="critical" size="small">Failed</Badge>
-                        )}
-                      </div>
-                    </InlineStack>
-                    <Divider />
-                  </div>
-                );
-              })}
-            </BlockStack>
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="span" variant="bodySm">
+                {undoFetcher.data?.success
+                  ? `Undone ${undoFetcher.data.undoneCount} fixes.`
+                  : `${completedIssues} fixes were applied.`}
+              </Text>
+              {!undoFetcher.data?.success && (
+                <Button
+                  tone="critical"
+                  onClick={handleUndo}
+                  loading={isUndoing}
+                >
+                  Undo all fixes
+                </Button>
+              )}
+            </InlineStack>
           </Card>
+        )}
+
+        {createFetcher.data?.error && (
+          <Banner tone="critical">
+            <p>{createFetcher.data.error}</p>
+          </Banner>
         )}
 
         <div style={{ height: "1rem" }} />
