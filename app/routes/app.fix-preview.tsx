@@ -94,25 +94,40 @@ export async function action({ request }: ActionFunctionArgs) {
       case "missing_category": {
         // AI suggests a name, then we search Shopify taxonomy for real GID
         const suggestedName = await ai.suggestCategoryName(title, description, productType);
-        const searchTerms = suggestedName.split(">").pop()?.trim() || suggestedName;
+        const segments = suggestedName.split(">").map((s: string) => s.trim());
 
-        const taxResponse = await admin.graphql(
-          `query TaxSearch($query: String!) {
-            taxonomy {
-              categories(first: 5, search: $query) {
-                nodes {
-                  id
-                  name
-                  fullName
-                  isLeaf
+        // Search with multiple terms for better matches: last 2 segments, then last 1
+        const searchQueries = [
+          segments.slice(-2).join(" "),  // "Perfume & Cologne Men's Perfume"
+          segments.slice(-1).join(" "),  // "Men's Perfume"
+          productType || title,          // fallback to product type or title
+        ].filter(Boolean);
+
+        const allMatches: any[] = [];
+        const seenIds = new Set<string>();
+
+        for (const query of searchQueries) {
+          if (allMatches.length >= 5) break;
+          const taxResponse = await admin.graphql(
+            `query TaxSearch($query: String!) {
+              taxonomy {
+                categories(first: 5, search: $query) {
+                  nodes { id name fullName isLeaf }
                 }
               }
+            }`,
+            { variables: { query } },
+          );
+          const taxData = await taxResponse.json();
+          for (const node of taxData.data?.taxonomy?.categories?.nodes || []) {
+            if (!seenIds.has(node.id)) {
+              seenIds.add(node.id);
+              allMatches.push(node);
             }
-          }`,
-          { variables: { query: searchTerms } },
-        );
-        const taxData = await taxResponse.json();
-        const matches = taxData.data?.taxonomy?.categories?.nodes || [];
+          }
+        }
+
+        const matches = allMatches.slice(0, 5);
 
         preview = {
           type: "category",
