@@ -127,7 +127,8 @@ export default function FixAll() {
 
   const doneCount = Object.values(statuses).filter((s) => s === "done").length;
   const failedCount = Object.values(statuses).filter((s) => s === "failed").length;
-  const totalToFix = filteredIssues.length;
+  // Use ref length when running (stable), filtered length when not yet started
+  const totalToFix = filteredRef.current.length > 0 ? filteredRef.current.length : filteredIssues.length;
   const progress = totalToFix > 0 ? Math.round(((doneCount + failedCount) / totalToFix) * 100) : 0;
   const allDone = (doneCount + failedCount) === totalToFix && totalToFix > 0 && isRunning === false;
 
