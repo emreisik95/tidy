@@ -63,4 +63,13 @@ describe("parseJsonl", () => {
     expect(products).toHaveLength(1);
     expect(products[0].images).toEqual([]);
   });
+
+  it("handles malformed JSON lines gracefully", () => {
+    const jsonl = [
+      '{"id":"gid://shopify/Product/1","title":"Good","description":"","descriptionHtml":"","productType":"","vendor":"","tags":[],"seo":{}}',
+      'not valid json',
+    ].join("\n");
+    // Should throw on bad JSON
+    expect(() => parseJsonl(jsonl)).toThrow();
+  });
 });

@@ -146,4 +146,33 @@ describe("scoreProduct", () => {
     const result = scoreProduct(perfectProduct);
     expect(result.maxScore).toBe(100);
   });
+
+  it("handles product with all fields but no barcodes", () => {
+    const product = {
+      ...perfectProduct,
+      variants: [{ id: "v1", barcode: null }],
+    };
+    const result = scoreProduct(product);
+    expect(result.score).toBeLessThan(100);
+    const barcodeIssue = result.issues.find((i) => i.type === "missing_barcode");
+    expect(barcodeIssue).toBeDefined();
+  });
+
+  it("gives full score when all fields present", () => {
+    const result = scoreProduct(perfectProduct);
+    expect(result.score).toBe(100);
+    expect(result.maxScore).toBe(100);
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it("marks correct issues as AI fixable", () => {
+    const result = scoreProduct(emptyProduct);
+    const fixable = result.issues.filter((i) => i.aiFixable);
+    const nonFixable = result.issues.filter((i) => !i.aiFixable);
+    expect(fixable.length).toBeGreaterThan(0);
+    expect(nonFixable.length).toBeGreaterThan(0);
+    // Barcode and vendor should NOT be AI fixable
+    expect(nonFixable.some((i) => i.type === "missing_barcode")).toBe(true);
+    expect(nonFixable.some((i) => i.type === "missing_vendor")).toBe(true);
+  });
 });
