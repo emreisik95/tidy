@@ -158,6 +158,11 @@ export async function action({ request }: ActionFunctionArgs) {
         };
         break;
       }
+      case "missing_product_type": {
+        const suggested = await ai.suggestProductType(title, description);
+        preview = { type: "product_type", value: suggested, current: productType || null };
+        break;
+      }
       default:
         return json({ error: `Cannot preview fix for ${issueType}` }, { status: 400 });
     }

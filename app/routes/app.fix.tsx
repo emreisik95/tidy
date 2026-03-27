@@ -265,6 +265,30 @@ export async function action({ request }: ActionFunctionArgs) {
         break;
       }
 
+      case "missing_product_type": {
+        const suggestedType = await ai.suggestProductType(title, description);
+        await prisma.fixHistory.create({
+          data: {
+            shopDomain: session.shop,
+            productGid,
+            field: "productType",
+            oldValue: productType || "",
+            newValue: suggestedType,
+            fixType: "missing_product_type",
+          },
+        });
+        await admin.graphql(
+          `mutation($input: ProductInput!) {
+            productUpdate(input: $input) {
+              product { id }
+              userErrors { field message }
+            }
+          }`,
+          { variables: { input: { id: productGid, productType: suggestedType } } },
+        );
+        break;
+      }
+
       default:
         return json({ error: `Cannot fix ${issueType}` }, { status: 400 });
     }

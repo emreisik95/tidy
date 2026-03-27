@@ -197,6 +197,23 @@ function PreviewContent({ data }: { data: any }) {
     );
   }
 
+  if (type === "product_type") {
+    return (
+      <BlockStack gap="200">
+        {current && (
+          <>
+            <Text as="h3" variant="bodySm" tone="subdued">Current</Text>
+            <Text as="p" variant="bodySm" tone="subdued">{current}</Text>
+          </>
+        )}
+        <Text as="h3" variant="bodySm" fontWeight="bold">Suggested product type</Text>
+        <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+          <Text as="p" variant="bodyMd">{value}</Text>
+        </Box>
+      </BlockStack>
+    );
+  }
+
   if (type === "category") {
     return null; // Category has its own special UI with selectable options
   }

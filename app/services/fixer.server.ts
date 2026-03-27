@@ -188,6 +188,16 @@ export async function fixIssueWithToken(
       break;
     }
 
+    case "missing_product_type": {
+      const suggestedType = await ai.suggestProductType(
+        productData.title,
+        productData.description,
+      );
+      query = PRODUCT_UPDATE_MUTATION;
+      variables = { input: { id: productGid, productType: suggestedType } };
+      break;
+    }
+
     default:
       throw new Error(`Issue type ${issue.type} is not AI-fixable`);
   }

@@ -137,15 +137,39 @@ model Issue {
 }
 
 model FixHistory {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   shopDomain  String
   productGid  String
   field       String
   oldValue    String?
   newValue    String?
   fixType     String
-  appliedAt   DateTime @default(now())
-  rolledBack  Boolean  @default(false)
+  appliedAt   DateTime  @default(now())
+  rolledBack  Boolean   @default(false)
+  batchId     String?
+  batch       FixBatch? @relation(fields: [batchId], references: [id])
 
   @@index([shopDomain, productGid])
+  @@index([batchId])
+}
+
+enum FixBatchStatus {
+  pending
+  running
+  completed
+  cancelled
+}
+
+model FixBatch {
+  id              String         @id @default(cuid())
+  shopDomain      String
+  status          FixBatchStatus @default(pending)
+  totalIssues     Int            @default(0)
+  completedIssues Int            @default(0)
+  failedIssues    Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  fixes           FixHistory[]
+
+  @@index([shopDomain])
 }

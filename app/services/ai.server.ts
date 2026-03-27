@@ -195,3 +195,16 @@ Return JSON: {"category": "Category > Subcategory > Specific"}`,
   );
   return JSON.parse(raw).category;
 }
+
+export async function suggestProductType(
+  title: string,
+  description: string,
+): Promise<string> {
+  const raw = await generate(
+    `You assign product types to Shopify products. A product type is a short label like "T-Shirt", "Moisturizer", "Running Shoes". 1-3 words, capitalize each word. If unclear, return "General".
+${ANTI_SLOP}
+Return JSON: {"productType": "..."}`,
+    `What product type is this?\nTitle: ${title}${description ? `\nDescription: ${description.slice(0, 300)}` : ""}`,
+  );
+  return JSON.parse(raw).productType;
+}
