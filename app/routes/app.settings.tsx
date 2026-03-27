@@ -181,21 +181,43 @@ export default function Settings() {
         </Layout.AnnotatedSection>
 
         <Layout.AnnotatedSection
-          title="Alt text template"
-          description="Set a template for auto-generating alt text without AI. Uses product data like title, vendor, and type."
+          title="Alt text generation"
+          description="Choose how alt text is generated for product images. AI analyzes the image, template uses product data."
         >
           <Card>
-            <BlockStack gap="300">
-              <TextField
-                label="Template"
-                value={template}
-                onChange={(value) => setTemplate(value)}
-                placeholder="{title} - {vendor} - {product_type}"
-                autoComplete="off"
+            <BlockStack gap="400">
+              <Select
+                label="Method"
+                options={[
+                  { label: "AI (analyzes product image)", value: "ai" },
+                  { label: "Template (uses product data variables)", value: "template" },
+                ]}
+                value={template ? "template" : "ai"}
+                onChange={(value) => {
+                  if (value === "ai") {
+                    setTemplate("");
+                    const formData = new FormData();
+                    formData.set("intent", "altTextTemplate");
+                    formData.set("altTextTemplate", "");
+                    submit(formData, { method: "post" });
+                  }
+                }}
               />
-              <Text as="p" variant="bodySm" tone="subdued">
-                Available variables: {"{title}"}, {"{vendor}"}, {"{product_type}"}, {"{tags}"}, {"{variant_title}"}
-              </Text>
+
+              {(template || template === "") && (
+                <BlockStack gap="200">
+                  <TextField
+                    label="Template pattern"
+                    value={template}
+                    onChange={(value) => setTemplate(value)}
+                    placeholder="{title} - {vendor} - {product_type}"
+                    autoComplete="off"
+                    helpText="Leave empty to use AI. Variables: {title}, {vendor}, {product_type}, {tags}, {variant_title}"
+                    disabled={!template && template !== ""}
+                  />
+                </BlockStack>
+              )}
+
               <Button
                 onClick={() => {
                   const formData = new FormData();
