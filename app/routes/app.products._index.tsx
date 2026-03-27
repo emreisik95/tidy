@@ -149,15 +149,17 @@ export default function ProductList() {
                   }
                 >
                   <IndexTable.Cell>
-                    <InlineStack gap="300" blockAlign="center">
+                    <InlineStack gap="300" blockAlign="center" wrap={false}>
                       <Thumbnail
                         source={product.image || ImageIcon}
                         alt={product.title}
                         size="small"
                       />
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        {product.title}
-                      </Text>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                          {product.title}
+                        </Text>
+                      </div>
                     </InlineStack>
                   </IndexTable.Cell>
                   <IndexTable.Cell>

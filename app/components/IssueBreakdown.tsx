@@ -22,6 +22,7 @@ const AI_FIXABLE_TYPES = new Set([
   "missing_seo_description",
   "short_seo_description",
   "missing_product_type",
+  "missing_category",
   "no_tags",
 ]);
 
@@ -40,27 +41,27 @@ function severityTone(
 }
 
 export function IssueBreakdown({ issues }: { issues: IssueSummary[] }) {
-  const fixableCount = issues
-    .filter((i) => AI_FIXABLE_TYPES.has(i.type))
-    .reduce((sum, i) => sum + i.count, 0);
+  // Only show AI-fixable issues -- no point showing problems we can't solve
+  const fixableIssues = issues.filter((i) => AI_FIXABLE_TYPES.has(i.type));
+  const fixableCount = fixableIssues.reduce((sum, i) => sum + i.count, 0);
+
+  if (fixableIssues.length === 0) return null;
 
   return (
-    <Card>
+    <Card roundedAbove="sm">
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center">
-          <Text as="h2" variant="headingMd">
-            Issues found
+          <Text as="h2" variant="headingSm">
+            Fixable issues
           </Text>
-          {fixableCount > 0 && (
-            <Text as="span" variant="bodySm" tone="subdued">
-              {fixableCount} fixable with AI
-            </Text>
-          )}
+          <Text as="span" variant="bodySm" tone="subdued">
+            {fixableCount} total
+          </Text>
         </InlineStack>
 
         <Divider />
 
-        {issues.map((issue) => (
+        {fixableIssues.map((issue) => (
           <InlineStack
             key={issue.type}
             align="space-between"
@@ -68,7 +69,7 @@ export function IssueBreakdown({ issues }: { issues: IssueSummary[] }) {
             wrap={false}
           >
             <BlockStack gap="050">
-              <Text as="span" variant="bodyMd">
+              <Text as="span" variant="bodySm">
                 {formatIssueType(issue.type)}
               </Text>
               <Text as="span" variant="bodySm" tone="subdued">
@@ -79,11 +80,9 @@ export function IssueBreakdown({ issues }: { issues: IssueSummary[] }) {
               <Badge tone={severityTone(issue.severity)}>
                 {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
               </Badge>
-              {AI_FIXABLE_TYPES.has(issue.type) && (
-                <Button size="slim" url="/app/fix-all">
-                  Fix
-                </Button>
-              )}
+              <Button size="slim" url="/app/fix-all">
+                Fix
+              </Button>
             </InlineStack>
           </InlineStack>
         ))}
