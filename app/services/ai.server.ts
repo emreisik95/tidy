@@ -49,7 +49,7 @@ async function generate(
   userPrompt: string | Array<OpenAI.Chat.ChatCompletionContentPart>,
 ): Promise<string> {
   const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5.4-nano",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -116,7 +116,7 @@ export async function generateAltText(
   lang = "en",
 ): Promise<string> {
   const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5.4-nano",
     messages: [
       {
         role: "system",
