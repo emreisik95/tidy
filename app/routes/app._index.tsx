@@ -16,7 +16,7 @@ import {
   SkeletonBodyText,
 } from "@shopify/polaris";
 import { ImageIcon } from "@shopify/polaris-icons";
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useRevalidator } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -205,6 +205,22 @@ export default function Dashboard() {
   const isScanning = activeScanId !== null || scan?.status === "running" || scan?.status === "pending";
   const hasScanResults = scan?.status === "completed";
 
+  const [showGuide, setShowGuide] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const dismissed = localStorage.getItem("tidy-onboarding-dismissed");
+      if (dismissed === "true") setShowGuide(false);
+    }
+  }, []);
+
+  const dismissGuide = () => {
+    setShowGuide(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tidy-onboarding-dismissed", "true");
+    }
+  };
+
   const handleScan = useCallback(() => {
     scanFetcher.submit(null, { method: "POST", action: "/app/scan" });
   }, [scanFetcher]);
@@ -261,6 +277,14 @@ export default function Dashboard() {
                 Scanning {productCount} products. This takes under a minute.
               </Text>
             </InlineStack>
+          </Banner>
+        )}
+
+        {!hasScanResults && showGuide && (
+          <Banner title="How Tidy works" onDismiss={dismissGuide} tone="info">
+            <p>1. Scan your products to find missing data</p>
+            <p>2. Review issues and scores per product</p>
+            <p>3. Fix problems with AI or manually in Shopify admin</p>
           </Banner>
         )}
 

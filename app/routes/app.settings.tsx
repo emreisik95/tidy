@@ -168,6 +168,22 @@ export default function Settings() {
         </Layout.AnnotatedSection>
 
         <Layout.AnnotatedSection
+          title="Automatic scans"
+          description="Tidy will scan your products periodically to keep scores up to date."
+        >
+          <Card>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd">
+                Weekly automatic scans are coming soon. For now, use the Re-scan button on the dashboard.
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                You'll get notified when your store health score changes.
+              </Text>
+            </BlockStack>
+          </Card>
+        </Layout.AnnotatedSection>
+
+        <Layout.AnnotatedSection
           title="Plan"
           description="Choose the plan that fits your store."
         >
@@ -194,7 +210,7 @@ export default function Settings() {
                 <InlineStack align="space-between" blockAlign="center">
                   <BlockStack gap="050">
                     <Text as="h2" variant="headingMd">Basic</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">$4.99/mo</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">$4.99/mo or $47.90/yr (save 20%)</Text>
                   </BlockStack>
                   {plan === "basic" ? (
                     <Badge tone="success">Current</Badge>
@@ -218,7 +234,7 @@ export default function Settings() {
                 <InlineStack align="space-between" blockAlign="center">
                   <BlockStack gap="050">
                     <Text as="h2" variant="headingMd">AI</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">$9.99/mo</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">$9.99/mo or $95.90/yr (save 20%)</Text>
                   </BlockStack>
                   {plan === "ai" ? (
                     <Badge tone="success">Current</Badge>
