@@ -167,7 +167,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           orderBy: { createdAt: "desc" },
           take: 5,
           select: { score: true, issues: true, createdAt: true },
-        })
+        }).catch(() => [])
       : [],
   });
 }

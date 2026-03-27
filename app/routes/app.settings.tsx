@@ -168,22 +168,6 @@ export default function Settings() {
         </Layout.AnnotatedSection>
 
         <Layout.AnnotatedSection
-          title="Automatic scans"
-          description="Tidy will scan your products periodically to keep scores up to date."
-        >
-          <Card>
-            <BlockStack gap="200">
-              <Text as="p" variant="bodyMd">
-                Weekly automatic scans are coming soon. For now, use the Re-scan button on the dashboard.
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                You'll get notified when your store health score changes.
-              </Text>
-            </BlockStack>
-          </Card>
-        </Layout.AnnotatedSection>
-
-        <Layout.AnnotatedSection
           title="Plan"
           description="Choose the plan that fits your store."
         >
