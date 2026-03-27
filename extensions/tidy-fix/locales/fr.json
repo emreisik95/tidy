@@ -1,4 +1,14 @@
 {
-  "name": "tidy-fix",
-  "welcome": "Bienvenue dans l'extension {{target}}!"
+  "name": "Corriger avec Tidy",
+  "checking": "Vérification des données...",
+  "allGood": "Ce produit est correct. Aucun champ manquant.",
+  "issuesFound": "{{count}} problèmes trouvés",
+  "missingAltText": "Texte alternatif manquant",
+  "missingSeoTitle": "Titre SEO manquant",
+  "missingSeoDescription": "Description SEO manquante",
+  "missingDescription": "Description manquante ou courte",
+  "missingCategory": "Catégorie produit manquante",
+  "missingTags": "Pas de tags",
+  "openTidy": "Corriger dans Tidy",
+  "close": "Fermer"
 }
