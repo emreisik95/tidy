@@ -11,6 +11,8 @@ import {
   ProgressBar,
   Spinner,
   Divider,
+  Checkbox,
+  Button,
 } from "@shopify/polaris";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { authenticate } from "../shopify.server";
@@ -24,6 +26,16 @@ interface FixableIssue {
   issueLabel: string;
 }
 
+const ISSUE_TYPE_LABELS: Record<string, string> = {
+  missing_alt_text: "Alt text",
+  missing_seo_title: "SEO metadata",
+  missing_description: "Descriptions",
+  short_description: "Short descriptions",
+  missing_category: "Categories",
+  no_tags: "Tags",
+  missing_product_type: "Product type",
+};
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
 
@@ -31,14 +43,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     where: { domain: session.shop },
   });
 
-  if (!shop) return json({ issues: [] as FixableIssue[] });
+  if (!shop) return json({ issues: [] as FixableIssue[], typeCounts: {} as Record<string, number> });
 
   const latestScan = await prisma.scan.findFirst({
     where: { shopId: shop.id, status: "completed" },
     orderBy: { startedAt: "desc" },
   });
 
-  if (!latestScan) return json({ issues: [] as FixableIssue[] });
+  if (!latestScan) return json({ issues: [] as FixableIssue[], typeCounts: {} as Record<string, number> });
 
   const productScores = await prisma.productScore.findMany({
     where: { scanId: latestScan.id },
@@ -50,7 +62,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     orderBy: { score: "asc" },
   });
 
-  // Deduplicate SEO issues per product (they get fixed together)
   const SEO_TYPES = new Set([
     "missing_seo_title",
     "missing_seo_description",
@@ -58,11 +69,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   ]);
 
   const issues: FixableIssue[] = [];
+  const typeCounts: Record<string, number> = {};
+
   for (const ps of productScores) {
     const seenTypes = new Set<string>();
 
     for (const issue of ps.issues) {
-      // Group SEO issues into one
       if (SEO_TYPES.has(issue.type)) {
         if (seenTypes.has("seo")) continue;
         seenTypes.add("seo");
@@ -73,6 +85,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           issueType: issue.type,
           issueLabel: "SEO Metadata",
         });
+        typeCounts["missing_seo_title"] = (typeCounts["missing_seo_title"] || 0) + 1;
       } else {
         const label = issue.type
           .replace(/_/g, " ")
@@ -84,44 +97,65 @@ export async function loader({ request }: LoaderFunctionArgs) {
           issueType: issue.type,
           issueLabel: label,
         });
+        typeCounts[issue.type] = (typeCounts[issue.type] || 0) + 1;
       }
     }
   }
 
-  return json({ issues });
+  return json({ issues, typeCounts });
 }
 
-type FixStatus = "pending" | "fixing" | "done" | "failed";
+type FixStatus = "pending" | "fixing" | "done" | "failed" | "skipped";
 
 export default function FixAll() {
-  const { issues } = useLoaderData<typeof loader>();
+  const { issues, typeCounts } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<{ success?: boolean; error?: string }>();
+
+  // Selected issue types (all enabled by default)
+  const availableTypes = Object.keys(typeCounts);
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(
+    new Set(availableTypes),
+  );
+
+  const filteredIssues = issues.filter((i) => selectedTypes.has(i.issueType));
+
   const [statuses, setStatuses] = useState<Record<string, FixStatus>>({});
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isRunning, setIsRunning] = useState(false);
   const indexRef = useRef(-1);
+  const filteredRef = useRef<FixableIssue[]>([]);
 
   const doneCount = Object.values(statuses).filter((s) => s === "done").length;
   const failedCount = Object.values(statuses).filter((s) => s === "failed").length;
-  const progress = issues.length > 0 ? Math.round(((doneCount + failedCount) / issues.length) * 100) : 0;
-  const allDone = doneCount + failedCount === issues.length && issues.length > 0;
+  const totalToFix = filteredIssues.length;
+  const progress = totalToFix > 0 ? Math.round(((doneCount + failedCount) / totalToFix) * 100) : 0;
+  const allDone = (doneCount + failedCount) === totalToFix && totalToFix > 0 && isRunning === false;
+
+  const toggleType = useCallback((type: string) => {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
 
   const startFixing = useCallback(() => {
-    if (issues.length === 0) return;
+    if (filteredIssues.length === 0) return;
+    filteredRef.current = filteredIssues;
     setIsRunning(true);
     const initial: Record<string, FixStatus> = {};
-    issues.forEach((i) => { initial[i.issueId] = "pending"; });
+    filteredIssues.forEach((i) => { initial[i.issueId] = "pending"; });
     setStatuses(initial);
     setCurrentIndex(0);
     indexRef.current = 0;
-  }, [issues]);
+  }, [filteredIssues]);
 
-  // Process current issue
   useEffect(() => {
-    if (!isRunning || currentIndex < 0 || currentIndex >= issues.length) return;
+    if (!isRunning || currentIndex < 0 || currentIndex >= filteredRef.current.length) return;
     if (fetcher.state !== "idle") return;
 
-    const issue = issues[currentIndex];
+    const issue = filteredRef.current[currentIndex];
     setStatuses((prev) => ({ ...prev, [issue.issueId]: "fixing" }));
 
     fetcher.submit(
@@ -134,12 +168,11 @@ export default function FixAll() {
     );
   }, [currentIndex, isRunning, fetcher.state]);
 
-  // Handle fix result and move to next
   useEffect(() => {
     if (!isRunning || fetcher.state !== "idle" || !fetcher.data) return;
-    if (indexRef.current < 0 || indexRef.current >= issues.length) return;
+    if (indexRef.current < 0 || indexRef.current >= filteredRef.current.length) return;
 
-    const issue = issues[indexRef.current];
+    const issue = filteredRef.current[indexRef.current];
     const success = fetcher.data.success;
 
     setStatuses((prev) => ({
@@ -150,7 +183,7 @@ export default function FixAll() {
     const nextIndex = indexRef.current + 1;
     indexRef.current = nextIndex;
 
-    if (nextIndex < issues.length) {
+    if (nextIndex < filteredRef.current.length) {
       setCurrentIndex(nextIndex);
     } else {
       setIsRunning(false);
@@ -170,90 +203,112 @@ export default function FixAll() {
   return (
     <Page title="Fix all with AI" backAction={{ url: "/app" }}>
       <BlockStack gap="500">
-        {/* Progress */}
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center">
-              <Text as="h2" variant="headingMd">
-                {allDone
-                  ? `Done - ${doneCount} fixed, ${failedCount} failed`
-                  : isRunning
-                    ? `Fixing... ${doneCount} of ${issues.length}`
-                    : `${issues.length} issues to fix across your products`}
+        {/* Type selection */}
+        {!isRunning && !allDone && (
+          <Card roundedAbove="sm">
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingSm">
+                What do you want to fix?
               </Text>
-              {!isRunning && !allDone && (
-                <button
+              <Divider />
+              <BlockStack gap="200">
+                {availableTypes.map((type) => (
+                  <InlineStack key={type} align="space-between" blockAlign="center">
+                    <Checkbox
+                      label={ISSUE_TYPE_LABELS[type] || type}
+                      checked={selectedTypes.has(type)}
+                      onChange={() => toggleType(type)}
+                    />
+                    <Badge tone="info" size="small">
+                      {typeCounts[type]} products
+                    </Badge>
+                  </InlineStack>
+                ))}
+              </BlockStack>
+              <Divider />
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="span" variant="bodySm" tone="subdued">
+                  {filteredIssues.length} fixes selected
+                </Text>
+                <Button
+                  variant="primary"
                   onClick={startFixing}
-                  style={{
-                    padding: "8px 16px",
-                    background: "#3d3d3d",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                  }}
+                  disabled={filteredIssues.length === 0}
                 >
-                  Start fixing
-                </button>
-              )}
-            </InlineStack>
-            <ProgressBar
-              progress={progress}
-              tone={allDone && failedCount === 0 ? "success" : progress > 0 ? "primary" : "subdued"}
-              size="small"
-            />
-            <Text as="p" variant="bodySm" tone="subdued">
-              Each fix generates AI content and applies it to your Shopify product. This takes a few seconds per issue.
-            </Text>
-          </BlockStack>
-        </Card>
+                  Start fixing {filteredIssues.length} issues
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        )}
+
+        {/* Progress */}
+        {(isRunning || allDone) && (
+          <Card roundedAbove="sm">
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingSm">
+                  {allDone
+                    ? `Done -- ${doneCount} fixed${failedCount > 0 ? `, ${failedCount} failed` : ""}`
+                    : `Fixing... ${doneCount} of ${totalToFix}`}
+                </Text>
+                {allDone && (
+                  <Button url="/app" variant="primary">
+                    Back to dashboard
+                  </Button>
+                )}
+              </InlineStack>
+              <ProgressBar
+                progress={progress}
+                tone={allDone && failedCount === 0 ? "success" : "primary"}
+                size="small"
+              />
+            </BlockStack>
+          </Card>
+        )}
 
         {/* Issue list */}
-        <Card>
-          <BlockStack gap="200">
-            {issues.map((issue) => {
-              const status = statuses[issue.issueId] || "pending";
-              return (
-                <div key={issue.issueId}>
-                  <InlineStack
-                    align="space-between"
-                    blockAlign="center"
-                    gap="200"
-                  >
-                    <BlockStack gap="050">
-                      <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        {issue.productTitle}
-                      </Text>
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        {issue.issueLabel}
-                      </Text>
-                    </BlockStack>
-                    <div style={{ minWidth: 80, textAlign: "right" }}>
-                      {status === "pending" && (
-                        <Badge tone="info">Pending</Badge>
-                      )}
-                      {status === "fixing" && (
-                        <InlineStack gap="100" blockAlign="center">
-                          <Spinner size="small" />
-                          <Text as="span" variant="bodySm">Fixing</Text>
-                        </InlineStack>
-                      )}
-                      {status === "done" && (
-                        <Badge tone="success">Done</Badge>
-                      )}
-                      {status === "failed" && (
-                        <Badge tone="critical">Failed</Badge>
-                      )}
-                    </div>
-                  </InlineStack>
-                  <Divider />
-                </div>
-              );
-            })}
-          </BlockStack>
-        </Card>
+        {(isRunning || allDone) && (
+          <Card roundedAbove="sm">
+            <BlockStack gap="200">
+              {filteredRef.current.map((issue) => {
+                const status = statuses[issue.issueId] || "pending";
+                return (
+                  <div key={issue.issueId}>
+                    <InlineStack align="space-between" blockAlign="center" gap="200">
+                      <BlockStack gap="050">
+                        <Text as="span" variant="bodySm" fontWeight="semibold">
+                          {issue.productTitle}
+                        </Text>
+                        <Text as="span" variant="bodySm" tone="subdued">
+                          {issue.issueLabel}
+                        </Text>
+                      </BlockStack>
+                      <div style={{ minWidth: 70, textAlign: "right" }}>
+                        {status === "pending" && (
+                          <Text as="span" variant="bodySm" tone="subdued">Waiting</Text>
+                        )}
+                        {status === "fixing" && (
+                          <InlineStack gap="100" blockAlign="center">
+                            <Spinner size="small" />
+                          </InlineStack>
+                        )}
+                        {status === "done" && (
+                          <Badge tone="success" size="small">Done</Badge>
+                        )}
+                        {status === "failed" && (
+                          <Badge tone="critical" size="small">Failed</Badge>
+                        )}
+                      </div>
+                    </InlineStack>
+                    <Divider />
+                  </div>
+                );
+              })}
+            </BlockStack>
+          </Card>
+        )}
+
         <div style={{ height: "1rem" }} />
       </BlockStack>
     </Page>
