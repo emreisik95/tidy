@@ -254,6 +254,7 @@ export default function FixAll() {
             })}
           </BlockStack>
         </Card>
+        <div style={{ height: "1rem" }} />
       </BlockStack>
     </Page>
   );

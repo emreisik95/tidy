@@ -557,6 +557,7 @@ export default function ProductDetail() {
           </BlockStack>
         </BlockStack>
       </InlineGrid>
+      <div style={{ height: "1rem" }} />
     </Page>
   );
 }

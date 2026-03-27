@@ -378,6 +378,8 @@ export default function Dashboard() {
         {hasScanResults && issueList.length > 0 && (
           <IssueBreakdown issues={issueList} />
         )}
+
+        <div style={{ height: "1rem" }} />
       </BlockStack>
     </Page>
   );
