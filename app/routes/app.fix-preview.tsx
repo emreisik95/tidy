@@ -14,9 +14,17 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: "productGid and issueType required" }, { status: 400 });
   }
 
-  // Get shop language
+  // Get shop language and plan
   const shop = await prisma.shop.findUnique({ where: { domain: session.shop } });
   const lang = shop?.language || "en";
+
+  // Gate AI preview behind AI plan in production
+  if (process.env.NODE_ENV === "production" && shop?.plan !== "ai") {
+    return json(
+      { error: "AI fixes require the AI plan ($9.99/mo). Upgrade in Settings." },
+      { status: 403 },
+    );
+  }
 
   // Fetch current product data
   const productResponse = await admin.graphql(

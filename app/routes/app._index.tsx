@@ -137,6 +137,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return json({
     productCount,
     previewProducts,
+    plan: shop?.plan || "free",
     scan: latestScan
       ? {
           id: latestScan.id,
@@ -183,7 +184,7 @@ function StatusDot({ ok }: { ok: boolean | null }) {
 
 export default function Dashboard() {
   const navigation = useNavigation();
-  const { productCount, previewProducts, scan, issueList, totalIssues, aiFixableCount, shopStats, scanTrend } =
+  const { productCount, previewProducts, plan, scan, issueList, totalIssues, aiFixableCount, shopStats, scanTrend } =
     useLoaderData<typeof loader>();
   const scanFetcher = useFetcher<{ scanId: string }>();
   const statusFetcher = useFetcher<{ scan: { status: string } }>();
@@ -294,6 +295,17 @@ export default function Dashboard() {
               Hit "Scan my products" to find missing descriptions, alt text,
               SEO fields, and other gaps that hurt your Google and search visibility.
             </p>
+          </Banner>
+        )}
+
+        {/* Free plan limit warning */}
+        {hasScanResults && plan === "free" && productCount > 10 && (
+          <Banner
+            tone="warning"
+            title={`Free plan scanned 10 of ${productCount} products`}
+            action={{ content: "Upgrade for unlimited", url: "/app/settings" }}
+          >
+            <p>Upgrade to Basic or AI to scan your entire catalog.</p>
           </Banner>
         )}
 

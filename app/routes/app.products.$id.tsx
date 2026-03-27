@@ -110,6 +110,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           })),
         }
       : null,
+    plan: shop?.plan || "free",
+    canUseAI: (shop?.plan === "ai") || process.env.NODE_ENV !== "production",
   });
 }
 
@@ -199,7 +201,7 @@ function PreviewContent({ data }: { data: any }) {
 
 export default function ProductDetail() {
   const navigation = useNavigation();
-  const { productGid, product, score } = useLoaderData<typeof loader>();
+  const { productGid, product, score, canUseAI } = useLoaderData<typeof loader>();
   const previewFetcher = useFetcher<{ preview?: any; error?: string }>();
   const fixFetcher = useFetcher<{ success?: boolean; error?: string }>();
   const revalidator = useRevalidator();
@@ -447,7 +449,7 @@ export default function ProductDetail() {
                             </Text>
                           </BlockStack>
                         </InlineStack>
-                        {issue.aiFixable && (
+                        {issue.aiFixable && canUseAI && (
                           <Button
                             size="slim"
                             variant="primary"
@@ -458,6 +460,11 @@ export default function ProductDetail() {
                             }
                           >
                             Preview fix
+                          </Button>
+                        )}
+                        {issue.aiFixable && !canUseAI && (
+                          <Button size="slim" url="/app/settings">
+                            Upgrade to fix
                           </Button>
                         )}
                       </InlineStack>

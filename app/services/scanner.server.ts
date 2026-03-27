@@ -175,7 +175,16 @@ async function processInline(scanId: string, jsonlUrl: string) {
   const res = await fetch(jsonlUrl);
   if (!res.ok) throw new Error(`Failed to download JSONL: ${res.status}`);
   const text = await res.text();
-  const products = parseJsonl(text);
+  let products = parseJsonl(text);
+
+  // Free plan: limit to first 10 products
+  const scan = await prisma.scan.findUniqueOrThrow({
+    where: { id: scanId },
+    include: { shop: true },
+  });
+  if (scan.shop.plan === "free") {
+    products = products.slice(0, 10);
+  }
 
   let totalScore = 0;
 
