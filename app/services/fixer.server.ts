@@ -24,24 +24,45 @@ async function shopifyGraphql(
   accessToken: string,
   query: string,
   variables: Record<string, any>,
-) {
-  const response = await fetch(
-    `https://${shopDomain}/admin/api/2026-04/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken,
+  maxRetries = 3,
+): Promise<any> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const response = await fetch(
+      `https://${shopDomain}/admin/api/2026-04/graphql.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": accessToken,
+        },
+        body: JSON.stringify({ query, variables }),
       },
-      body: JSON.stringify({ query, variables }),
-    },
-  );
+    );
 
-  if (!response.ok) {
-    throw new Error(`Shopify API error: ${response.status}`);
+    // Rate limited -- wait and retry
+    if (response.status === 429) {
+      const retryAfter = parseFloat(response.headers.get("Retry-After") || "2");
+      console.warn(`Shopify rate limited, retrying in ${retryAfter}s`);
+      await new Promise((r) => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Shopify API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Check for throttled response in GraphQL extensions
+    const cost = data.extensions?.cost;
+    if (cost?.throttleStatus?.currentlyAvailable < 50) {
+      // Running low on budget, pause briefly
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    return data;
   }
-
-  return response.json();
+  throw new Error("Shopify API: max retries exceeded");
 }
 
 async function fetchProductData(

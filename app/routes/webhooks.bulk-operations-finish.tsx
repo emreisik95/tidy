@@ -11,10 +11,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     admin_graphql_api_id: string;
   };
 
-  // Get admin API context for this shop (webhook doesn't provide one)
+  // Respond immediately to Shopify (5s timeout requirement)
+  // Process asynchronously after response
   const { admin } = await unauthenticated.admin(shop);
 
-  await handleBulkOperationComplete(admin_graphql_api_id, shop, admin);
+  // Fire-and-forget: don't await, let it process in background
+  handleBulkOperationComplete(admin_graphql_api_id, shop, admin).catch(
+    (err) => console.error("Bulk operation processing failed:", err.message),
+  );
 
   return new Response();
 };
