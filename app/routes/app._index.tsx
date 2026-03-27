@@ -137,7 +137,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return json({
     productCount,
     previewProducts,
-    plan: shop?.plan || "free",
+    plan: process.env.NODE_ENV !== "production" ? "ai" : (shop?.plan || "free"),
     scan: latestScan
       ? {
           id: latestScan.id,

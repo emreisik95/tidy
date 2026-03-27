@@ -177,13 +177,15 @@ async function processInline(scanId: string, jsonlUrl: string) {
   const text = await res.text();
   let products = parseJsonl(text);
 
-  // Free plan: limit to first 10 products
-  const scan = await prisma.scan.findUniqueOrThrow({
-    where: { id: scanId },
-    include: { shop: true },
-  });
-  if (scan.shop.plan === "free") {
-    products = products.slice(0, 10);
+  // Free plan: limit to first 10 products (skip in dev mode)
+  if (process.env.NODE_ENV === "production") {
+    const scan = await prisma.scan.findUniqueOrThrow({
+      where: { id: scanId },
+      include: { shop: true },
+    });
+    if (scan.shop.plan === "free") {
+      products = products.slice(0, 10);
+    }
   }
 
   let totalScore = 0;
