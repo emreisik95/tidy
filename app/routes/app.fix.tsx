@@ -4,6 +4,16 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import * as ai from "../services/ai.server";
 
+function applyAltTextTemplate(template: string, product: any, variantTitle?: string): string {
+  return template
+    .replace(/\{title\}/g, product.title || "")
+    .replace(/\{vendor\}/g, product.vendor || "")
+    .replace(/\{product_type\}/g, product.productType || "")
+    .replace(/\{tags\}/g, (product.tags || []).join(", "))
+    .replace(/\{variant_title\}/g, variantTitle || "")
+    .trim();
+}
+
 export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
@@ -16,8 +26,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // Get shop language
-  const shop = await prisma.shop.findUnique({ where: { domain: session.shop } });
-  const lang = shop?.language || "en";
+  const shopRecord = await prisma.shop.findUnique({ where: { domain: session.shop } });
+  const lang = shopRecord?.language || "en";
+  const altTextTemplate = shopRecord?.altTextTemplate;
 
   // Fetch current product data
   const productResponse = await admin.graphql(
@@ -26,7 +37,9 @@ export async function action({ request }: ActionFunctionArgs) {
         title
         description
         productType
+        vendor
         tags
+        seo { title description }
         media(first: 20) {
           edges {
             node {
@@ -116,12 +129,20 @@ export async function action({ request }: ActionFunctionArgs) {
       case "missing_alt_text": {
         const images = product.media.edges
           .filter((e: any) => e.node.image && !e.node.alt?.trim());
-        const mediaUpdates = await Promise.all(
-          images.map(async (e: any) => ({
+        let mediaUpdates: { id: string; alt: string }[];
+        if (altTextTemplate) {
+          mediaUpdates = images.map((e: any) => ({
             id: e.node.id,
-            alt: await ai.generateAltText(e.node.image.url, title, lang),
-          })),
-        );
+            alt: applyAltTextTemplate(altTextTemplate, { title, productType, vendor: product.vendor, tags: product.tags }),
+          }));
+        } else {
+          mediaUpdates = await Promise.all(
+            images.map(async (e: any) => ({
+              id: e.node.id,
+              alt: await ai.generateAltText(e.node.image.url, title, lang),
+            })),
+          );
+        }
         if (mediaUpdates.length > 0) {
           await admin.graphql(
             `mutation($productId: ID!, $media: [UpdateMediaInput!]!) {
@@ -208,10 +229,9 @@ export async function action({ request }: ActionFunctionArgs) {
     await rescanProduct(admin, productGid);
 
     // Increment fix counter
-    const shop = await prisma.shop.findUnique({ where: { domain: session.shop } });
-    if (shop) {
+    if (shopRecord) {
       await prisma.shop.update({
-        where: { id: shop.id },
+        where: { id: shopRecord.id },
         data: { totalFixes: { increment: 1 } },
       });
     }

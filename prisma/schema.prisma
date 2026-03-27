@@ -73,6 +73,7 @@ model Shop {
   lastScanAt    DateTime?
   totalFixes    Int      @default(0)
   totalScans    Int      @default(0)
+  altTextTemplate String?
   scans         Scan[]
   scanSnapshots ScanSnapshot[]
 }

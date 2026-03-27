@@ -12,6 +12,7 @@ import {
   Banner,
   Divider,
   Select,
+  TextField,
 } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import { authenticate, PLANS } from "../shopify.server";
@@ -57,6 +58,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return json({
     plan,
     language: shop?.language || "en",
+    altTextTemplate: shop?.altTextTemplate || "",
     isDev: process.env.NODE_ENV !== "production",
   });
 }
@@ -72,6 +74,16 @@ export async function action({ request }: ActionFunctionArgs) {
       where: { domain: session.shop },
       update: { language },
       create: { domain: session.shop, language },
+    });
+    return json({ success: true });
+  }
+
+  if (intent === "altTextTemplate") {
+    const altTextTemplate = formData.get("altTextTemplate") as string;
+    await prisma.shop.upsert({
+      where: { domain: session.shop },
+      update: { altTextTemplate: altTextTemplate || null },
+      create: { domain: session.shop, altTextTemplate: altTextTemplate || null },
     });
     return json({ success: true });
   }
@@ -135,9 +147,10 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { plan, language, isDev } = useLoaderData<typeof loader>();
+  const { plan, language, altTextTemplate, isDev } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const [selectedLang, setSelectedLang] = useState(language);
+  const [template, setTemplate] = useState(altTextTemplate);
 
   const handleLangChange = useCallback(
     (value: string) => {
@@ -164,6 +177,36 @@ export default function Settings() {
               value={selectedLang}
               onChange={handleLangChange}
             />
+          </Card>
+        </Layout.AnnotatedSection>
+
+        <Layout.AnnotatedSection
+          title="Alt text template"
+          description="Set a template for auto-generating alt text without AI. Uses product data like title, vendor, and type."
+        >
+          <Card>
+            <BlockStack gap="300">
+              <TextField
+                label="Template"
+                value={template}
+                onChange={(value) => setTemplate(value)}
+                placeholder="{title} - {vendor} - {product_type}"
+                autoComplete="off"
+              />
+              <Text as="p" variant="bodySm" tone="subdued">
+                Available variables: {"{title}"}, {"{vendor}"}, {"{product_type}"}, {"{tags}"}, {"{variant_title}"}
+              </Text>
+              <Button
+                onClick={() => {
+                  const formData = new FormData();
+                  formData.set("intent", "altTextTemplate");
+                  formData.set("altTextTemplate", template);
+                  submit(formData, { method: "post" });
+                }}
+              >
+                Save template
+              </Button>
+            </BlockStack>
           </Card>
         </Layout.AnnotatedSection>
 
