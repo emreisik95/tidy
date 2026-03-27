@@ -167,6 +167,7 @@ model FixBatch {
   totalIssues     Int            @default(0)
   completedIssues Int            @default(0)
   failedIssues    Int            @default(0)
+  errorLog        String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   fixes           FixHistory[]

@@ -160,6 +160,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       totalScans: shop?.totalScans ?? 0,
     },
     // Scan trend (last 5 snapshots)
+    // Active/recent batch fix status
+    activeBatch: shop
+      ? await prisma.fixBatch.findFirst({
+          where: { shopDomain: session.shop },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, status: true, totalIssues: true, completedIssues: true, failedIssues: true },
+        }).catch(() => null)
+      : null,
     scanTrend: shop
       ? await prisma.scanSnapshot.findMany({
           where: { shopId: shop.id },
@@ -181,7 +189,7 @@ function StatusDot({ ok }: { ok: boolean | null }) {
 }
 
 export default function Dashboard() {
-  const { productCount, previewProducts, plan, scan, issueList, totalIssues, aiFixableCount, shopStats, scanTrend } =
+  const { productCount, previewProducts, plan, scan, issueList, totalIssues, aiFixableCount, shopStats, scanTrend, activeBatch } =
     useLoaderData<typeof loader>();
   const scanFetcher = useFetcher<{ scanId: string }>();
   const statusFetcher = useFetcher<{ scan: { status: string } }>();
@@ -289,6 +297,28 @@ export default function Dashboard() {
           >
             <p>Upgrade to Basic or AI to scan your entire catalog.</p>
           </Banner>
+        )}
+
+        {/* Active batch status */}
+        {activeBatch && (activeBatch.status === "running" || activeBatch.status === "pending") && (
+          <Banner
+            tone="info"
+            title={`Fixing ${activeBatch.completedIssues} of ${activeBatch.totalIssues} issues`}
+            action={{ content: "View progress", url: "/app/fix-all" }}
+          >
+            <p>AI fixes are running in the background.</p>
+          </Banner>
+        )}
+
+        {activeBatch && activeBatch.status === "completed" && activeBatch.completedIssues > 0 && (
+          <Card roundedAbove="sm">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="span" variant="bodySm">
+                Last batch: {activeBatch.completedIssues} fixed{activeBatch.failedIssues > 0 ? `, ${activeBatch.failedIssues} failed` : ""}
+              </Text>
+              <Button size="slim" url="/app/fix-all">Details</Button>
+            </InlineStack>
+          </Card>
         )}
 
         {/* Score card - full width */}

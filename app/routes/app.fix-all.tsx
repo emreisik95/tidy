@@ -119,6 +119,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           totalIssues: latestBatch.totalIssues,
           completedIssues: latestBatch.completedIssues,
           failedIssues: latestBatch.failedIssues,
+          errorLog: latestBatch.errorLog,
           createdAt: latestBatch.createdAt,
         }
       : null,
@@ -286,6 +287,27 @@ export default function FixAll() {
                   <p>All fixes from the last batch have been undone.</p>
                 </Banner>
               )}
+              {latestBatch.failedIssues > 0 && (
+                <>
+                  <Divider />
+                  <Text as="p" variant="bodySm" tone="critical">
+                    {latestBatch.failedIssues} failed -- see details below
+                  </Text>
+                </>
+              )}
+            </BlockStack>
+          </Card>
+        )}
+
+        {/* Last batch error log */}
+        {!batchId && !isStarting && latestBatch?.errorLog && latestBatch.failedIssues > 0 && (
+          <Card roundedAbove="sm">
+            <BlockStack gap="200">
+              <Text as="h3" variant="headingSm" tone="critical">Error details</Text>
+              <Divider />
+              {latestBatch.errorLog.split("\n").map((line: string, i: number) => (
+                <Text key={i} as="p" variant="bodySm" tone="subdued">{line}</Text>
+              ))}
             </BlockStack>
           </Card>
         )}
@@ -379,6 +401,25 @@ export default function FixAll() {
           <Banner tone="info">
             <p>You can leave this page. Fixes continue in the background.</p>
           </Banner>
+        )}
+
+        {/* Error details */}
+        {batch?.errorLog && failedIssues > 0 && (
+          <Card roundedAbove="sm">
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingSm" tone="critical">
+                {failedIssues} {failedIssues === 1 ? "fix" : "fixes"} failed
+              </Text>
+              <Divider />
+              <BlockStack gap="100">
+                {batch.errorLog.split("\n").map((line: string, i: number) => (
+                  <Text key={i} as="p" variant="bodySm" tone="subdued">
+                    {line}
+                  </Text>
+                ))}
+              </BlockStack>
+            </BlockStack>
+          </Card>
         )}
 
         {/* Undo all */}

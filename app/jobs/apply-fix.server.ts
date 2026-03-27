@@ -57,9 +57,19 @@ export function startFixWorker() {
     console.error(`Fix job ${job?.id} failed:`, err.message);
     if (job?.data.batchId) {
       const { default: prisma } = await import("../db.server");
+
+      // Append error to batch log
+      const errorEntry = `${job.data.issueType} (${job.data.productGid.split("/").pop()}): ${err.message.slice(0, 100)}`;
+      const existing = await prisma.fixBatch.findUnique({ where: { id: job.data.batchId } });
+      const currentLog = existing?.errorLog || "";
+      const newLog = currentLog ? `${currentLog}\n${errorEntry}` : errorEntry;
+
       const batch = await prisma.fixBatch.update({
         where: { id: job.data.batchId },
-        data: { failedIssues: { increment: 1 } },
+        data: {
+          failedIssues: { increment: 1 },
+          errorLog: newLog.slice(0, 5000), // Cap at 5KB
+        },
       });
       if (batch.completedIssues + batch.failedIssues >= batch.totalIssues) {
         await prisma.fixBatch.update({

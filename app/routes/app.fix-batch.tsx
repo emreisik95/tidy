@@ -25,6 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       totalIssues: batch.totalIssues,
       completedIssues: batch.completedIssues,
       failedIssues: batch.failedIssues,
+      errorLog: batch.errorLog,
     },
   });
 }

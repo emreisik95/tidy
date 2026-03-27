@@ -203,6 +203,43 @@ export async function fixIssueWithToken(
       break;
     }
 
+    case "missing_category": {
+      const suggestedName = await ai.suggestCategoryName(
+        productData.title,
+        productData.description,
+        productData.productType,
+      );
+      // Search Shopify taxonomy for best match
+      const segments = suggestedName.split(">").map((s: string) => s.trim());
+      const searchTerms = [
+        segments.slice(-2).join(" "),
+        segments.slice(-1).join(" "),
+        productData.productType || productData.title,
+      ].filter(Boolean);
+
+      let bestCategoryId: string | null = null;
+
+      for (const term of searchTerms) {
+        const taxData = await shopifyGraphql(shopDomain, accessToken,
+          `query TaxSearch($query: String!) { taxonomy { categories(first: 5, search: $query) { nodes { id isLeaf } } } }`,
+          { query: term },
+        );
+        const nodes = taxData.data?.taxonomy?.categories?.nodes || [];
+        const leaf = nodes.find((n: any) => n.isLeaf);
+        if (leaf) { bestCategoryId = leaf.id; break; }
+        if (!bestCategoryId && nodes.length > 0) bestCategoryId = nodes[0].id;
+      }
+
+      if (!bestCategoryId) {
+        // Can't find a category -- skip
+        return { success: false, skipped: true };
+      }
+
+      query = PRODUCT_UPDATE_MUTATION;
+      variables = { input: { id: productGid, category: bestCategoryId } };
+      break;
+    }
+
     default:
       throw new Error(`Issue type ${issue.type} is not AI-fixable`);
   }
