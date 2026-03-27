@@ -153,6 +153,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
           0,
         )
       : 0,
+    // Quick stats
+    shopStats: {
+      totalFixes: shop?.totalFixes ?? 0,
+      totalScans: shop?.totalScans ?? 0,
+    },
+    // Scan trend (last 5 snapshots)
+    scanTrend: shop
+      ? await prisma.scanSnapshot.findMany({
+          where: { shopId: shop.id },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: { score: true, issues: true, createdAt: true },
+        })
+      : [],
   });
 }
 
@@ -166,7 +180,7 @@ function StatusDot({ ok }: { ok: boolean | null }) {
 }
 
 export default function Dashboard() {
-  const { productCount, previewProducts, scan, issueList, totalIssues, aiFixableCount } =
+  const { productCount, previewProducts, scan, issueList, totalIssues, aiFixableCount, shopStats, scanTrend } =
     useLoaderData<typeof loader>();
   const scanFetcher = useFetcher<{ scanId: string }>();
   const statusFetcher = useFetcher<{ scan: { status: string } }>();
@@ -252,6 +266,30 @@ export default function Dashboard() {
             totalProducts={scan.totalProducts}
             issueCount={totalIssues}
           />
+        )}
+
+        {/* Quick stats row */}
+        {hasScanResults && (shopStats.totalFixes > 0 || scanTrend.length > 1) && (
+          <Card roundedAbove="sm">
+            <InlineStack align="space-between" blockAlign="center">
+              {shopStats.totalFixes > 0 && (
+                <Text as="span" variant="bodySm" tone="subdued">
+                  {shopStats.totalFixes} fixes applied total
+                </Text>
+              )}
+              {scanTrend.length > 1 && (() => {
+                const current = scanTrend[0].score;
+                const previous = scanTrend[1].score;
+                const diff = Math.round(current - previous);
+                if (diff === 0) return null;
+                return (
+                  <Badge tone={diff > 0 ? "success" : "critical"} size="small">
+                    {diff > 0 ? "+" : ""}{diff} since last scan
+                  </Badge>
+                );
+              })()}
+            </InlineStack>
+          </Card>
         )}
 
         {/* Fix all banner -- compact */}

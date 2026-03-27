@@ -207,6 +207,15 @@ export async function action({ request }: ActionFunctionArgs) {
     // Re-scan this single product to get fresh score
     await rescanProduct(admin, productGid);
 
+    // Increment fix counter
+    const shop = await prisma.shop.findUnique({ where: { domain: session.shop } });
+    if (shop) {
+      await prisma.shop.update({
+        where: { id: shop.id },
+        data: { totalFixes: { increment: 1 } },
+      });
+    }
+
     return json({ success: true, issueId, issueType });
   } catch (err: any) {
     console.error("Fix error:", err.message);

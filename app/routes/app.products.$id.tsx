@@ -118,12 +118,20 @@ function formatIssueType(type: string): string {
 
 function PreviewContent({ data }: { data: any }) {
   if (!data?.preview) return null;
-  const { type, value } = data.preview;
+  const { type, value, current } = data.preview;
 
   if (type === "description") {
     return (
-      <BlockStack gap="200">
-        <Text as="h3" variant="headingSm">Generated description</Text>
+      <BlockStack gap="300">
+        {current && (
+          <>
+            <Text as="h3" variant="bodySm" tone="subdued">Current</Text>
+            <Box padding="300" borderRadius="200" border="divider">
+              <Text as="p" variant="bodySm" tone="subdued">{current}</Text>
+            </Box>
+          </>
+        )}
+        <Text as="h3" variant="bodySm" fontWeight="bold">Generated</Text>
         <Box padding="300" background="bg-surface-secondary" borderRadius="200">
           <Text as="p" variant="bodyMd">{value}</Text>
         </Box>
@@ -134,7 +142,12 @@ function PreviewContent({ data }: { data: any }) {
   if (type === "seo") {
     return (
       <BlockStack gap="300">
-        <Text as="h3" variant="headingSm">Generated SEO metadata</Text>
+        {current?.seoTitle && (
+          <>
+            <Text as="span" variant="bodySm" tone="subdued">Current: {current.seoTitle}</Text>
+          </>
+        )}
+        <Text as="h3" variant="bodySm" fontWeight="bold">Generated SEO</Text>
         <Box padding="300" background="bg-surface-secondary" borderRadius="200">
           <BlockStack gap="200">
             <Text as="p" variant="bodyMd" fontWeight="bold">{value.seoTitle}</Text>

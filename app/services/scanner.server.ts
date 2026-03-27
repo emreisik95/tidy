@@ -123,6 +123,12 @@ export async function handleBulkOperationComplete(
     return;
   }
 
+  // Idempotency: skip if already completed or failed
+  if (scan.status === "completed" || scan.status === "failed") {
+    console.log(`Scan ${scan.id} already ${scan.status}, skipping duplicate webhook`);
+    return;
+  }
+
   // Query Shopify for the actual result URL (webhook doesn't include it)
   const response = await admin.graphql(
     `
@@ -218,10 +224,26 @@ async function processInline(scanId: string, jsonlUrl: string) {
       },
     });
 
+    const overallScoreFinal = overallScore;
+    const totalIssues = products.reduce((sum, p) => sum + scoreProduct(p).issues.length, 0);
+
     const scan = await tx.scan.findUniqueOrThrow({ where: { id: scanId } });
     await tx.shop.update({
       where: { id: scan.shopId },
-      data: { lastScanAt: new Date() },
+      data: {
+        lastScanAt: new Date(),
+        totalScans: { increment: 1 },
+      },
+    });
+
+    // Save scan snapshot for history/trends
+    await tx.scanSnapshot.create({
+      data: {
+        shopId: scan.shopId,
+        score: overallScoreFinal,
+        products: products.length,
+        issues: totalIssues,
+      },
     });
   });
 

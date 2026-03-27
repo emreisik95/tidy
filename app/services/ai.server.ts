@@ -44,20 +44,35 @@ LEGAL SAFETY:
 - No environmental claims ("eco-friendly", "sustainable") unless stated in input
 `;
 
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const isRetryable = err.status === 429 || err.status === 500 || err.status === 503;
+      if (!isRetryable || attempt === maxRetries - 1) throw err;
+      const delay = Math.pow(2, attempt) * 1000;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("Retry exhausted");
+}
+
 async function generate(
   systemPrompt: string,
   userPrompt: string | Array<OpenAI.Chat.ChatCompletionContentPart>,
 ): Promise<string> {
-  const response = await client.chat.completions.create({
-    model: "gpt-5.4-nano",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
+  return withRetry(async () => {
+    const response = await client.chat.completions.create({
+      model: "gpt-5.4-nano",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+    return response.choices[0].message.content || "{}";
   });
-
-  return response.choices[0].message.content || "{}";
 }
 
 export async function generateDescription(

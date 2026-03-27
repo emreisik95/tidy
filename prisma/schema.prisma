@@ -64,14 +64,29 @@ enum IssueType {
 }
 
 model Shop {
-  id          String   @id @default(cuid())
-  domain      String   @unique
-  plan        PlanName @default(free)
-  language    String   @default("en")
-  billingId   String?
-  installedAt DateTime @default(now())
-  lastScanAt  DateTime?
-  scans       Scan[]
+  id            String   @id @default(cuid())
+  domain        String   @unique
+  plan          PlanName @default(free)
+  language      String   @default("en")
+  billingId     String?
+  installedAt   DateTime @default(now())
+  lastScanAt    DateTime?
+  totalFixes    Int      @default(0)
+  totalScans    Int      @default(0)
+  scans         Scan[]
+  scanSnapshots ScanSnapshot[]
+}
+
+model ScanSnapshot {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  score     Float
+  products  Int
+  issues    Int
+  createdAt DateTime @default(now())
+
+  @@index([shopId])
 }
 
 model Scan {

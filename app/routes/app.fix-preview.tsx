@@ -63,14 +63,21 @@ export async function action({ request }: ActionFunctionArgs) {
       case "missing_description":
       case "short_description": {
         const generated = await ai.generateDescription(title, productType, description, lang);
-        preview = { type: "description", value: generated };
+        preview = { type: "description", value: generated, current: description || null };
         break;
       }
       case "missing_seo_title":
       case "missing_seo_description":
       case "short_seo_description": {
         const seo = await ai.generateSeo(title, description, productType, lang);
-        preview = { type: "seo", value: seo };
+        preview = {
+          type: "seo",
+          value: seo,
+          current: {
+            seoTitle: product.seo?.title || null,
+            seoDescription: product.seo?.description || null,
+          },
+        };
         break;
       }
       case "missing_alt_text": {
