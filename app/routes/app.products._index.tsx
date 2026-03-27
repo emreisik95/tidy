@@ -141,11 +141,19 @@ export default function ProductList() {
     );
   }
 
+  const issueProducts = products.filter((p) => p.issueCount > 0);
+  const cleanProducts = products.filter((p) => p.issueCount === 0);
+
   return (
     <Page
       title="Products"
       subtitle={`${products.length} products scanned`}
       backAction={{ url: "/app" }}
+      primaryAction={
+        issueProducts.length > 0
+          ? { content: "Fix all with AI", url: "/app/fix-all" }
+          : undefined
+      }
     >
       <BlockStack gap="400">
         {products.map((product) => (
